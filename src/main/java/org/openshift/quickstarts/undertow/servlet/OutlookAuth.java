@@ -135,8 +135,8 @@ public class OutlookAuth {
 
                     Map map = mapper.readValue((String) obj, Map.class);
 
-                    r.put("token_type", (Map) map.get("token_type"));
-                    r.put("token", (Map) map.get("access_token"));
+                    r.put("token_type", map.get("token_type"));
+                    r.put("token", map.get("access_token"));
                 }
 
                 r.put("content", obj);
