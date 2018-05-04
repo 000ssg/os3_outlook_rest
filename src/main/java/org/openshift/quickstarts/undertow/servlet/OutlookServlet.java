@@ -13,6 +13,7 @@ import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 import org.codehaus.jackson.map.ObjectMapper;
 
 public class OutlookServlet extends HttpServlet {
@@ -62,13 +63,22 @@ public class OutlookServlet extends HttpServlet {
                 extra += "\n  " + entry.getKey() + ": " + ("" + entry.getValue()).replace("\n", "\n  ");
             }
             if (tresp.containsKey("token")) {
-                req.getSession().setAttribute("bearer", tresp.get("token"));
+                req.getSession().setAttribute("token_type", tresp.get("token_type"));
+                req.getSession().setAttribute("token", tresp.get("token"));
             }
         } else if ("roomslists".equals(m)) {
             try {
                 String rrl = oa.roomsLists((String) req.getSession().getAttribute("token"));
                 Map map = mapper.readValue(rrl, Map.class);
                 extra = "Rooms lists:\n  " + Dump.dump(map, true, true).replace("\n", "\n  ");
+            } catch (Throwable th) {
+                extra = "Rooms lists: ERROR:\n  " + th;
+            }
+        } else if ("messages".equals(m)) {
+            try {
+                String rrl = oa.messages((String) req.getSession().getAttribute("token"));
+                Map map = mapper.readValue(rrl, Map.class);
+                extra = "Messages:\n  " + Dump.dump(map, true, true).replace("\n", "\n  ");
             } catch (Throwable th) {
                 extra = "Rooms lists: ERROR:\n  " + th;
             }
@@ -81,6 +91,22 @@ public class OutlookServlet extends HttpServlet {
         writer.write("<form method='POST'>");
         writer.write("<table><caption>Outlook login (" + m + ")</caption>");
         writer.write("<tr><th>User</th><td><input type='text' name='user' value='" + u + "'></td></tr>");
+        writer.write("<tr><th>login</th><td><a href='/login'>LOGIN</a></td></tr>");
+        writer.write("<tr><th>messages</th><td><a href='/messages'>MESSAGES</a></td></tr>");
+        writer.write("<tr><th>roomlists</th><td><a href='/roomlists'>ROOM LISTS</a></td></tr>");
+        writer.write("<tr><th>session</th><td><pre>");
+        {
+            HttpSession sess = req.getSession();
+            try {
+                List<String> ans = Collections.list(sess.getAttributeNames());
+                writer.write("attributes(" + ans.size() + "): " + ans);
+                for (String an : ans) {
+                    writer.write("\n  " + an + ": " + ("" + sess.getAttribute(an)).replace("\n", "\n  "));
+                }
+            } catch (Throwable th) {
+            }
+        }
+        writer.write("</pre></td></tr>");
         writer.write("</table>");
         writer.write("</form>");
         writer.write("<br/>");

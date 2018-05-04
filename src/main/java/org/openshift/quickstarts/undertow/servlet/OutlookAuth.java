@@ -11,12 +11,15 @@ import java.net.URLEncoder;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.codehaus.jackson.map.ObjectMapper;
 
 public class OutlookAuth {
 
+    static ObjectMapper mapper = new ObjectMapper();
+
     String authUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
     String tokenUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
-    String roomsListUrl = "https://outlook.office.com/api/beta/me/findroomlists";
+    String roomsListUrl = "https://graph.microsoft.com/beta/me/findroomlists";//  "https://outlook.office.com/api/beta/me/findroomlists";
 
     String redirect = "https://openjdk-app-ddd.1d35.starter-us-east-1.openshiftapps.com/tokenized";
     String clientId;
@@ -130,18 +133,10 @@ public class OutlookAuth {
                 if (ct != null && (ct.toLowerCase().contains("text") || ct.toLowerCase().contains("json")) && obj instanceof byte[]) {
                     obj = new String((byte[]) obj, (ce != null) ? ce : "ISO-8859-1");
 
-                    String rm = (String) obj;
-                    int idx = rm.indexOf("\"access_token\"");
-                    if (idx != -1) {
-                        idx = rm.indexOf(":", idx);
-                    }
-                    if (idx != -1) {
-                        String at = rm.substring(idx + 2);
-                        idx = at.indexOf("\"");
-                        at = at.substring(0, idx);
-                        r.put("token", at);
-                    }
+                    Map map = mapper.readValue((String) obj, Map.class);
 
+                    r.put("token_type", (Map) map.get("token_type"));
+                    r.put("token", (Map) map.get("access_token"));
                 }
 
                 r.put("content", obj);
@@ -162,15 +157,170 @@ public class OutlookAuth {
         conn.setRequestMethod("GET");
         conn.setRequestProperty("Accept", "application/json");
         conn.setRequestProperty("Authorization", "Bearer " + token);
-        //conn.setRequestProperty("X-AnchorMailbox","sergey.sidorov@digia.com");
+        //conn.setRequestProperty("X-AnchorMailbox", "sergey.sidorov@digia.com");
 
-        conn.connect();
+        Object obj = null;
+        try {
+            conn.connect();
 
-        Object obj = conn.getContent();
-        if (obj instanceof byte[]) {
-            String ct = conn.getContentType();
-            String ce = conn.getContentEncoding();
-            obj = new String((byte[]) obj, (ce != null) ? ce : "ISO-8859-1");
+            obj = conn.getContent();
+            if (obj instanceof byte[]) {
+                String ct = conn.getContentType();
+                String ce = conn.getContentEncoding();
+                obj = new String((byte[]) obj, (ce != null) ? ce : "ISO-8859-1");
+            }
+        } catch (Throwable th) {
+            th.printStackTrace();
+
+            Map<String, Object> r = new LinkedHashMap<String, Object>();
+
+            r.put("headers", conn.getHeaderFields());
+            r.put("code", conn.getResponseCode());
+            r.put("message", conn.getResponseMessage());
+            if (conn.getContentType() != null) {
+                String ct = conn.getContentType();
+                String ce = conn.getContentEncoding();
+                r.put("contentLength", conn.getContentLength());
+                r.put("contentEncoding", ce);
+                r.put("contentType", ct);
+
+                try {
+                    obj = conn.getContent();
+                    if (obj instanceof InputStream) {
+                        InputStream is = (InputStream) obj;
+                        ByteArrayOutputStream os = new ByteArrayOutputStream();
+                        byte[] buf = new byte[1024];
+                        int c = 0;
+                        while ((c = is.read(buf)) != -1) {
+                            os.write(buf, 0, c);
+                        }
+                        obj = os.toByteArray();
+                        is.close();
+                    }
+                } catch (Throwable th1) {
+                }
+
+                try {
+                    InputStream is = conn.getErrorStream();
+                    if (is != null) {
+                        ByteArrayOutputStream os = new ByteArrayOutputStream();
+                        byte[] buf = new byte[1024];
+                        int c = 0;
+                        while ((c = is.read(buf)) != -1) {
+                            os.write(buf, 0, c);
+                        }
+                        obj = os.toByteArray();
+                        is.close();
+                    }
+                } catch (Throwable th1) {
+                }
+
+                if (ct != null && (ct.toLowerCase().contains("text") || ct.toLowerCase().contains("json")) && obj instanceof byte[]) {
+                    obj = new String((byte[]) obj, (ce != null) ? ce : "ISO-8859-1");
+                }
+
+                r.put("content", obj);
+            }
+
+        }
+
+        return "" + obj;
+    }
+
+    public String messages(String token) throws IOException {
+        URL url = new URL("https://graph.microsoft.com/v1.0/me/mailfolders/inbox/messages?$select=subject,from,receivedDateTime&$top=25&$orderby=receivedDateTime%20DESC");
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        conn.setRequestProperty("Accept", "application/json");
+        conn.setRequestProperty("Authorization", "Bearer " + token);
+        //conn.setRequestProperty("X-AnchorMailbox", "sergey.sidorov@digia.com");
+
+        Object obj = null;
+        try {
+            conn.connect();
+
+            obj = conn.getContent();
+            if (obj instanceof InputStream) {
+                String ct = conn.getContentType();
+                String ce = conn.getContentEncoding();
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                byte[] buf = new byte[1024];
+                int c = 0;
+                while ((c = ((InputStream) obj).read()) != -1) {
+                    baos.write(buf, 0, c);
+                }
+                obj = new String(baos.toByteArray(), (ce != null) ? ce : "ISO-8859-1");
+            } else if (obj instanceof byte[]) {
+                String ct = conn.getContentType();
+                String ce = conn.getContentEncoding();
+                obj = new String((byte[]) obj, (ce != null) ? ce : "ISO-8859-1");
+            }
+        } catch (Throwable th) {
+            th.printStackTrace();
+
+            Map<String, Object> r = new LinkedHashMap<String, Object>();
+
+            r.put("headers", conn.getHeaderFields());
+            r.put("code", conn.getResponseCode());
+            r.put("message", conn.getResponseMessage());
+            if (conn.getContentType() != null) {
+                String ct = conn.getContentType();
+                String ce = conn.getContentEncoding();
+                r.put("contentLength", conn.getContentLength());
+                r.put("contentEncoding", ce);
+                r.put("contentType", ct);
+
+                try {
+                    obj = conn.getContent();
+                    if (obj instanceof InputStream) {
+                        InputStream is = (InputStream) obj;
+                        ByteArrayOutputStream os = new ByteArrayOutputStream();
+                        byte[] buf = new byte[1024];
+                        int c = 0;
+                        while ((c = is.read(buf)) != -1) {
+                            os.write(buf, 0, c);
+                        }
+                        obj = os.toByteArray();
+                        is.close();
+                    }
+                } catch (Throwable th1) {
+                }
+
+                try {
+                    InputStream is = conn.getErrorStream();
+                    if (is != null) {
+                        ByteArrayOutputStream os = new ByteArrayOutputStream();
+                        byte[] buf = new byte[1024];
+                        int c = 0;
+                        while ((c = is.read(buf)) != -1) {
+                            os.write(buf, 0, c);
+                        }
+                        obj = os.toByteArray();
+                        is.close();
+                    }
+                } catch (Throwable th1) {
+                }
+
+                if (ct != null && (ct.toLowerCase().contains("text") || ct.toLowerCase().contains("json")) && obj instanceof byte[]) {
+                    obj = new String((byte[]) obj, (ce != null) ? ce : "ISO-8859-1");
+
+                    String rm = (String) obj;
+                    int idx = rm.indexOf("\"access_token\"");
+                    if (idx != -1) {
+                        idx = rm.indexOf(":", idx);
+                    }
+                    if (idx != -1) {
+                        String at = rm.substring(idx + 2);
+                        idx = at.indexOf("\"");
+                        at = at.substring(0, idx);
+                        r.put("token", at);
+                    }
+
+                }
+
+                r.put("content", obj);
+            }
+
         }
 
         return "" + obj;
@@ -219,10 +369,25 @@ public class OutlookAuth {
     }
 
     public static void main(String[] args) throws Exception {
+        String ttt = "{\"token_type\":\"Bearer\",\"scope\":\"Mail.Read User.Read\",\"expires_in\":3599,\"ext_expires_in\":0,\"access_token\":\"eyJ0eXAiOiJKV1QiLCJub25jZSI6IkFRQUJBQUFBQUFEWDhHQ2k2SnM2U0s4MlRzRDJQYjdyOHhpR2tiQUIxZ2F2cHhPZjEtdDVkZG9CWHJtdGV6WVl5Y2gwTTFkeS1DQ1QtLVEwbmRmSF9QZjIyNk9iaXB4RmE2N0FNRlgxSmRJSzl5YllnQmRnVUNBQSIsImFsZyI6IlJTMjU2IiwieDV0IjoiaUJqTDFSY3F6aGl5NGZweEl4ZFpxb2hNMllrIiwia2lkIjoiaUJqTDFSY3F6aGl5NGZweEl4ZFpxb2hNMllrIn0.eyJhdWQiOiJodHRwczovL2dyYXBoLm1pY3Jvc29mdC5jb20iLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLm5ldC82ZmNlNGJiOC0zNTAxLTQxYzktYWZjYy1kYjBmYjUxYzdlM2QvIiwiaWF0IjoxNTI1NDMzODA5LCJuYmYiOjE1MjU0MzM4MDksImV4cCI6MTUyNTQzNzcwOSwiYWNyIjoiMSIsImFpbyI6IlkyZGdZSkI1RUIvQTBjdWxkWDdaT1o2WDBuci9FNUp1dEVhMS9GaHVyMUN5bWZHVDRsY0EiLCJhbXIiOlsicHdkIl0sImFwcF9kaXNwbGF5bmFtZSI6InRlc3Qgb3V0bG9vayByZXN0IiwiYXBwaWQiOiI4NmIwZjYxYy0yZTY5LTQxZGYtYmRiZS00OWViY2UzZjc3OTUiLCJhcHBpZGFjciI6IjEiLCJmYW1pbHlfbmFtZSI6IlNpZG9yb3YiLCJnaXZlbl9uYW1lIjoiU2VyZ2V5IiwiaXBhZGRyIjoiOTEuMjE3LjI0OC4xMSIsIm5hbWUiOiJTaWRvcm92IFNlcmdleSIsIm9pZCI6ImIxMTMxMzk1LWY5NTAtNDFiYi1iZDVmLTk2OWFiMmFkMzZmNyIsIm9ucHJlbV9zaWQiOiJTLTEtNS0yMS0yNDMwNjcxNDYyLTI4NTI5NzE1NTEtMjc5NjAxMTA1NS0yMTQ1MiIsInBsYXRmIjoiMyIsInB1aWQiOiIxMDAzMDAwMDg5MzFCNTMxIiwic2NwIjoiTWFpbC5SZWFkIFVzZXIuUmVhZCIsInNpZ25pbl9zdGF0ZSI6WyJpbmtub3dubnR3ayIsImttc2kiXSwic3ViIjoiYmdObElSOWVoYnpqMWlPU05FZkVXRjJJZnFoeWgzQ242UXhjZ3otalp6OCIsInRpZCI6IjZmY2U0YmI4LTM1MDEtNDFjOS1hZmNjLWRiMGZiNTFjN2UzZCIsInVuaXF1ZV9uYW1lIjoic2VyZ2V5LnNpZG9yb3ZAZGlnaWEuY29tIiwidXBuIjoic2VyZ2V5LnNpZG9yb3ZAZGlnaWEuY29tIiwidXRpIjoid01WaDduUW0xVTZiQTNRbEZGWUZBQSIsInZlciI6IjEuMCJ9.O2fKeeVKNCEqE9aJ-ODy8OH5chHGHv9gTnffx0bAyyqJEXFGgmZS11x_a0ahpWbS-Ro6dqKvI4m1iKFUN1cDoqByN8UbcRYsdgNG5rbZeM9sQUNXWWetQr_bxRMz-QL61II_cYywYBAM3SyYUgBmr6PUm_gGqPnmO9CR--mEhwpJDGG1_3-ZVthaBAQf-fqrVf4BoKVrGDpNs3CcCqmHdVQU8payV6E4l8T6jtY0i5fwEQlrxn7SwR_URB21yq8zu6pVgDJBOOCblkgof3H_cthJfIOREHBPKqebUVHt_1W0qCLFNNNpv4rd_k-0XoS4ctiVSX2fzPpucWXuzWleUw\",\"id_token\":\"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImlCakwxUmNxemhpeTRmcHhJeGRacW9oTTJZayJ9.eyJhdWQiOiI4NmIwZjYxYy0yZTY5LTQxZGYtYmRiZS00OWViY2UzZjc3OTUiLCJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vNmZjZTRiYjgtMzUwMS00MWM5LWFmY2MtZGIwZmI1MWM3ZTNkL3YyLjAiLCJpYXQiOjE1MjU0MzM4MDksIm5iZiI6MTUyNTQzMzgwOSwiZXhwIjoxNTI1NDM3NzA5LCJhaW8iOiJBVFFBeS84SEFBQUE4QUg1MFNLR0RWb1BBQ01WMXVTeWNxd2NXY1VsY2pFTVRNVDk3cFA4Vytnd05CUXRKeGw2cUtvRENjSFdmMVY3Iiwic3ViIjoiTENJWDFvSGpyNllfS1hHRFppQXY1NlVFenpLakNNX043S1pPc2hfUTg2YyIsInRpZCI6IjZmY2U0YmI4LTM1MDEtNDFjOS1hZmNjLWRiMGZiNTFjN2UzZCIsInV0aSI6IndNVmg3blFtMVU2YkEzUWxGRllGQUEiLCJ2ZXIiOiIyLjAifQ.X39q_gP2rCvm27Bn4u29_5YIc8Pd9Ecjz7zIkNXHDgseJN5UVKe1XP1U9ZVrRnuRfDxRRIbiRUkVPESBTXS-2q77UPG6jE6q762z8Pi0srD3UpiGJg4AneStkvXONb5j-ueVW0HuMZLsucTSm3Ht5nTRLWlkF5MTe-59ZcMt4PORx71H9s3IFunqsLQ_Uzja7-aSjSzGMAuUivfa0K_LgcHtEVBKUnoswTBB-lXMNP4T4bcR2Oy2CCAWgqheaNlQqgvIkm7__MDlKufH_FqgQJWwmDG2LCq-eEGSzIttteBm78W-Xc5PjPQF1WZCDv5Kmyj_kZkmsD1PS8Q-7j9K9g\"}";
+        Map m = mapper.readValue(ttt, Map.class);
+
+        String tt = (String) m.get("token_type");
+        String at = (String) m.get("access_token");
+        String it = (String) m.get("id_token");
+
+        com.sun.org.apache.xml.internal.security.Init.init();
         OutlookAuth oa = new OutlookAuth("86b0f61c-2e69-41df-bdbe-49ebce3f7795");
         //oa.clientId="86b0f61c-2e69-41df-bdbe-49ebce3f7795";
         //oa.clientSecret="wGPTTH123+}@ojfukoJK03=";
-        String token="eyJ0eXAiOiJKV1QiLCJub25jZSI6IkFRQUJBQUFBQUFEWDhHQ2k2SnM2U0s4MlRzRDJQYjdyY2ZpSEVtbUFkb2xfWXd4Ni03Y1VuZi1NQ255d0lqMDl2cU9SMWhxc1hHS1EzQ2wwcHpDVGdVeTE1VzhFeG5aNkd2T19kaHFLeklTYmlacFFkTTl1bnlBQSIsImFsZyI6IlJTMjU2IiwieDV0IjoiaUJqTDFSY3F6aGl5NGZweEl4ZFpxb2hNMllrIiwia2lkIjoiaUJqTDFSY3F6aGl5NGZweEl4ZFpxb2hNMllrIn0.eyJhdWQiOiJodHRwczovL2dyYXBoLm1pY3Jvc29mdC5jb20iLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLm5ldC82ZmNlNGJiOC0zNTAxLTQxYzktYWZjYy1kYjBmYjUxYzdlM2QvIiwiaWF0IjoxNTI1NDI5NTE4LCJuYmYiOjE1MjU0Mjk1MTgsImV4cCI6MTUyNTQzMzQxOCwiYWNyIjoiMSIsImFpbyI6IkFTUUEyLzhIQUFBQTR2NStrR2xmUE9HbG43eGFrczZ6c2FyYnhOa1kzZXFYMGhIdlRnUWZJd1E9IiwiYW1yIjpbInB3ZCJdLCJhcHBfZGlzcGxheW5hbWUiOiJ0ZXN0IG91dGxvb2sgcmVzdCIsImFwcGlkIjoiODZiMGY2MWMtMmU2OS00MWRmLWJkYmUtNDllYmNlM2Y3Nzk1IiwiYXBwaWRhY3IiOiIxIiwiZmFtaWx5X25hbWUiOiJTaWRvcm92IiwiZ2l2ZW5fbmFtZSI6IlNlcmdleSIsImlwYWRkciI6IjkxLjIxNy4yNDguMTEiLCJuYW1lIjoiU2lkb3JvdiBTZXJnZXkiLCJvaWQiOiJiMTEzMTM5NS1mOTUwLTQxYmItYmQ1Zi05NjlhYjJhZDM2ZjciLCJvbnByZW1fc2lkIjoiUy0xLTUtMjEtMjQzMDY3MTQ2Mi0yODUyOTcxNTUxLTI3OTYwMTEwNTUtMjE0NTIiLCJwbGF0ZiI6IjMiLCJwdWlkIjoiMTAwMzAwMDA4OTMxQjUzMSIsInNjcCI6Ik1haWwuUmVhZCIsInNpZ25pbl9zdGF0ZSI6WyJpbmtub3dubnR3ayIsImttc2kiXSwic3ViIjoiYmdObElSOWVoYnpqMWlPU05FZkVXRjJJZnFoeWgzQ242UXhjZ3otalp6OCIsInRpZCI6IjZmY2U0YmI4LTM1MDEtNDFjOS1hZmNjLWRiMGZiNTFjN2UzZCIsInVuaXF1ZV9uYW1lIjoic2VyZ2V5LnNpZG9yb3ZAZGlnaWEuY29tIiwidXBuIjoic2VyZ2V5LnNpZG9yb3ZAZGlnaWEuY29tIiwidXRpIjoibG1KLVFkZHFlRWUya09RRWduNEVBQSIsInZlciI6IjEuMCJ9.DQLUzOT82P_RZ5n9OV81pLC4Xl9njiy6quxa45CN3hjD6hl1TblrWZvXPF7GpK0vMgeWwaNXANhUWZoih746DVAFvRJHdicUBDSdoBKx61STLZOn-XVL99_9kBAreDKGS1SmldnjAIz-Fl5LbRGl3py5v-Hz_t-nj6BdmqUXtHgXAQOLhoydRDbBaw-nuwIuB5RiJ4OkRwi_NmBBK5zeHIFCdHWxOgoszHds6catMq2v9IUstQhX31w2_t5tb3kLKzQtFPz2iltyJgKV3vqeeAUckY6fTZpmLnuzhNsHoJv-v-mtgdUyje-xW0xSU4VL88eltftbrPW8Zg58GZD8wQ\",\"id_token\":\"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImlCakwxUmNxemhpeTRmcHhJeGRacW9oTTJZayJ9.eyJhdWQiOiI4NmIwZjYxYy0yZTY5LTQxZGYtYmRiZS00OWViY2UzZjc3OTUiLCJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vNmZjZTRiYjgtMzUwMS00MWM5LWFmY2MtZGIwZmI1MWM3ZTNkL3YyLjAiLCJpYXQiOjE1MjU0Mjk1MTgsIm5iZiI6MTUyNTQyOTUxOCwiZXhwIjoxNTI1NDMzNDE4LCJhaW8iOiJBVFFBeS84SEFBQUF5K2kvd3V1VnU3TStxcEphb29OUXF0a1NsYzFqTmNLZ21vL0t4RTB0STVqd05qVk1LdzI0ejdDMDk4aUxPS3I2Iiwic3ViIjoiTENJWDFvSGpyNllfS1hHRFppQXY1NlVFenpLakNNX043S1pPc2hfUTg2YyIsInRpZCI6IjZmY2U0YmI4LTM1MDEtNDFjOS1hZmNjLWRiMGZiNTFjN2UzZCIsInV0aSI6ImxtSi1RZGRxZUVlMmtPUUVnbjRFQUEiLCJ2ZXIiOiIyLjAifQ.QZCGoZXyd0uyx5D8edH0XJ0Jn4vgHkWMcNC7s_B28xzbaArImC1mYNDWxGrjgh3gc4o6rp_TnCYelLCRWhx9enxonCLgX-C2tgbhndiyUAkuvwVUZuBaNdacqE8OnDAYum1TNt4MGiN8DSnWjTutIgK0113Q8s-hchk_Pg9jBSs_7wzgJz3moapyOaJTBCDJyEZ9OKK_PRUESy8dXKHQsuA8YU5X9VH1yhu2PF0CISnPlw8bFrOsK2G8KlnCY5b4CI-D0nlHxjyuFaQOhMo1IUC_SKVMiwfy93mH5TcutEfEdDSP_Dic0z0_ozoguMbf_oDJOH0XRIB7dcGCg_gAFA";
-        String rl=oa.roomsLists(token);
+
+        for (String[] token2 : new String[][]{{"access", at}, {"id", it}}) {
+            System.out.println("TOKEN: " + token2[0] + " -> " + token2[1]);
+            try {
+                String rl = oa.roomsLists(token2[1]);
+                System.out.println("Response:\n" + rl);
+            } catch (Throwable th) {
+            }
+        }
     }
 }

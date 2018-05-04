@@ -66,7 +66,10 @@ public class ServletServer {
 									.addMapping("/login"),
 							servlet("OutlookServletT4", OutlookServlet.class)
 									.addInitParam(OutlookServlet.M, "roomslists")
-									.addMapping("/roomslists")
+									.addMapping("/roomslists"),
+							servlet("OutlookServletT5", OutlookServlet.class)
+									.addInitParam(OutlookServlet.M, "messages")
+									.addMapping("/messages")
 
 			);
 
