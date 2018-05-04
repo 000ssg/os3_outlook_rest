@@ -81,9 +81,9 @@ public class OutlookAuth {
         body.append("&redirect_uri=");
         body.append(URLEncoder.encode(redirect, "UTF-8"));
         body.append("&client_id=");
-        body.append(URLEncoder.encode(clientId,"UTF-8"));
+        body.append(URLEncoder.encode(clientId, "UTF-8"));
         body.append("&client_secret=");
-        body.append(URLEncoder.encode(clientSecret,"UTF-8"));
+        body.append(URLEncoder.encode(clientSecret, "UTF-8"));
 
         r.put("RequestURL", url);
         try {
@@ -96,7 +96,7 @@ public class OutlookAuth {
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
 
-            conn.setDoInput(false);
+            conn.setDoInput(true);
             conn.setDoOutput(true);
             conn.connect();
             conn.getOutputStream().write(body.toString().getBytes());
@@ -106,9 +106,11 @@ public class OutlookAuth {
             r.put("code", conn.getResponseCode());
             r.put("message", conn.getResponseMessage());
             if (conn.getContentType() != null) {
+                String ct = conn.getContentType();
+                String ce = conn.getContentEncoding();
                 r.put("contentLength", conn.getContentLength());
-                r.put("contentEncoding", conn.getContentEncoding());
-                r.put("contentType", conn.getContentType());
+                r.put("contentEncoding", ce);
+                r.put("contentType", ct);
 
                 Object obj = conn.getContent();
                 if (obj instanceof InputStream) {
@@ -122,6 +124,11 @@ public class OutlookAuth {
                     obj = os.toByteArray();
                     is.close();
                 }
+
+                if (ct != null && (ct.toLowerCase().contains("text") || ct.toLowerCase().contains("json")) && obj instanceof byte[]) {
+                    obj = new String((byte[]) obj, (ce != null) ? ce : "ISO-8859-1");
+                }
+
                 r.put("content", obj);
             }
         } catch (Throwable th) {
