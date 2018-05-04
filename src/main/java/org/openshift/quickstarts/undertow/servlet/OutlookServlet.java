@@ -75,12 +75,13 @@ public class OutlookServlet extends HttpServlet {
                 extra = "Rooms lists: ERROR:\n  " + th;
             }
         } else if ("messages".equals(m)) {
+            String rrl=null;
             try {
-                String rrl = oa.messages((String) req.getSession().getAttribute("token"));
+                rrl = oa.messages((String) req.getSession().getAttribute("token"));
                 Map map = mapper.readValue(rrl, Map.class);
                 extra = "Messages:\n  " + Dump.dump(map, true, true).replace("\n", "\n  ");
             } catch (Throwable th) {
-                extra = "Rooms lists: ERROR:\n  " + th;
+                extra = "Rooms lists:\n"+rrl+"\n---  ERROR:\n  " + th;
             }
         }
 
@@ -93,7 +94,7 @@ public class OutlookServlet extends HttpServlet {
         writer.write("<tr><th>User</th><td><input type='text' name='user' value='" + u + "'></td></tr>");
         writer.write("<tr><th>login</th><td><a href='/login'>LOGIN</a></td></tr>");
         writer.write("<tr><th>messages</th><td><a href='/messages'>MESSAGES</a></td></tr>");
-        writer.write("<tr><th>roomlists</th><td><a href='/roomlists'>ROOM LISTS</a></td></tr>");
+        writer.write("<tr><th>roomlists</th><td><a href='/roomslists'>ROOM LISTS</a></td></tr>");
         writer.write("<tr><th>session</th><td><pre>");
         {
             HttpSession sess = req.getSession();
