@@ -26,7 +26,7 @@ public class OutlookAuth {
     String clientSecret;
     String responseType = "code";
     String grantType = "authorization_code";
-    String scope = "openid+User.Read";
+    String scope = "openid+User.Read+Calendars.Read+Contacts.Read";
     //
     String code;
 
