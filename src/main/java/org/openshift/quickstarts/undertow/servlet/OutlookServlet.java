@@ -13,9 +13,11 @@ import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.codehaus.jackson.map.ObjectMapper;
 
 public class OutlookServlet extends HttpServlet {
 
+    public static ObjectMapper mapper = new ObjectMapper();
     public static final String M = "m";
     public static final String U = "u";
     public static final String P = "p";
@@ -59,6 +61,17 @@ public class OutlookServlet extends HttpServlet {
             for (Map.Entry entry : tresp.entrySet()) {
                 extra += "\n  " + entry.getKey() + ": " + ("" + entry.getValue()).replace("\n", "\n  ");
             }
+            if (tresp.containsKey("token")) {
+                req.getSession().setAttribute("bearer", tresp.get("token"));
+            }
+        } else if ("roomslists".equals(m)) {
+            try {
+                String rrl = oa.roomsLists((String) req.getSession().getAttribute("token"));
+                Map map = mapper.readValue(rrl, Map.class);
+                extra = "Rooms lists:\n  " + Dump.dump(map, true, true).replace("\n", "\n  ");
+            } catch (Throwable th) {
+                extra = "Rooms lists: ERROR:\n  " + th;
+            }
         }
 
         PrintWriter writer = resp.getWriter();
@@ -68,14 +81,15 @@ public class OutlookServlet extends HttpServlet {
         writer.write("<form method='POST'>");
         writer.write("<table><caption>Outlook login (" + m + ")</caption>");
         writer.write("<tr><th>User</th><td><input type='text' name='user' value='" + u + "'></td></tr>");
-        writer.write("<tr><th>User</th><td><input type='text' name='user' value='" + u + "'></td></tr>");
         writer.write("</table>");
         writer.write("</form>");
         writer.write("<br/>");
+        writer.write("<hr/>");
         writer.write("Extra:");
         writer.write("<pre>");
         writer.write(extra);
         writer.write("</pre>");
+        writer.write("<hr/>");
         writer.write("<br/>");
         writer.write("<pre>");
         writer.write("Request:");

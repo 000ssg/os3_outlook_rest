@@ -16,6 +16,8 @@ public class OutlookAuth {
 
     String authUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
     String tokenUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
+    String roomsListUrl = "https://outlook.office.com/api/beta/me/findroomlists";
+
     String redirect = "https://openjdk-app-ddd.1d35.starter-us-east-1.openshiftapps.com/tokenized";
     String clientId;
     String clientSecret;
@@ -127,6 +129,19 @@ public class OutlookAuth {
 
                 if (ct != null && (ct.toLowerCase().contains("text") || ct.toLowerCase().contains("json")) && obj instanceof byte[]) {
                     obj = new String((byte[]) obj, (ce != null) ? ce : "ISO-8859-1");
+
+                    String rm = (String) obj;
+                    int idx = rm.indexOf("\"access_token\"");
+                    if (idx != -1) {
+                        idx = rm.indexOf(":", idx);
+                    }
+                    if (idx != -1) {
+                        String at = rm.substring(idx + 2);
+                        idx = at.indexOf("\"");
+                        at = at.substring(0, idx);
+                        r.put("token", at);
+                    }
+
                 }
 
                 r.put("content", obj);
@@ -138,6 +153,27 @@ public class OutlookAuth {
         }
 
         return r;
+    }
+
+    public String roomsLists(String token) throws IOException {
+        URL url = new URL(roomsListUrl);
+
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        conn.setRequestProperty("Accept", "application/json");
+        conn.setRequestProperty("Authorization", "Bearer " + token);
+        //conn.setRequestProperty("X-AnchorMailbox","jason@contoso.onmicrosoft.com");
+
+        conn.connect();
+
+        Object obj = conn.getContent();
+        if (obj instanceof byte[]) {
+            String ct = conn.getContentType();
+            String ce = conn.getContentEncoding();
+            obj = new String((byte[]) obj, (ce != null) ? ce : "ISO-8859-1");
+        }
+
+        return "" + obj;
     }
 
     ////////////////////////////////////////////////////////////////////////////
