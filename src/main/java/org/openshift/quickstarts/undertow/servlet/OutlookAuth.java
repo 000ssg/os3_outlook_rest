@@ -81,14 +81,16 @@ public class OutlookAuth {
         body.append("&redirect_uri=");
         body.append(URLEncoder.encode(redirect, "UTF-8"));
         body.append("&client_id=");
-        body.append(clientId);
+        body.append(URLEncoder.encode(clientId,"UTF-8"));
         body.append("&client_secret=");
-        body.append(clientSecret);
+        body.append(URLEncoder.encode(clientSecret,"UTF-8"));
 
         r.put("RequestURL", url);
-        int csIdx=body.indexOf(clientSecret);
-        r.put("RequestBody", body.substring(0,csIdx)+"<CLIENT_SECRET>"+body.substring(csIdx+clientSecret.length()));
-
+        try {
+            int csIdx = body.indexOf(clientSecret);
+            r.put("RequestBody[" + csIdx + "/" + clientSecret.length() + "]", body.substring(0, csIdx) + "<CLIENT_SECRET>" + body.substring(csIdx + clientSecret.length()));
+        } catch (Throwable th) {
+        }
         try {
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
