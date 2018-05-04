@@ -96,8 +96,8 @@ public class OutlookAuth {
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
 
-            conn.setDoInput(true);
-            conn.setDoOutput(false);
+            conn.setDoInput(false);
+            conn.setDoOutput(true);
             conn.connect();
             conn.getOutputStream().write(body.toString().getBytes());
             conn.getOutputStream().close();
