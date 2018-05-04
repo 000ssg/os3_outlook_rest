@@ -52,7 +52,7 @@ public class OutlookServlet extends HttpServlet {
             //req.getRequestDispatcher(oa.getAuthURL().toString()).forward(req, resp);
             resp.sendRedirect(oa.getAuthURL().toString());
             return;
-        } else if ("tokenized".equals(m)) {
+        } else if ("token".equals(m)) {
             oa.clientSecret = "wGPTTH123+}@ojfukoJK03=";
             Map<String, Object> tresp = oa.requestToken("" + req.getParameter("code"));
             extra="Extra:\n"+tresp;

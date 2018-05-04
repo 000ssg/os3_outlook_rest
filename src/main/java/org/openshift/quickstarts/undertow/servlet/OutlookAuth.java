@@ -3,6 +3,8 @@ package org.openshift.quickstarts.undertow.servlet;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -68,8 +70,10 @@ public class OutlookAuth {
     }
 
     public Map<String, Object> requestToken(String code) throws IOException {
-        URL url=new URL(tokenUrl);
-        StringBuilder body=new StringBuilder();
+        Map<String, Object> r = new LinkedHashMap<String, Object>();
+
+        URL url = new URL(tokenUrl);
+        StringBuilder body = new StringBuilder();
         body.append("grant_type=");
         body.append(grantType);
         body.append("&code=");
@@ -80,40 +84,49 @@ public class OutlookAuth {
         body.append(clientId);
         body.append("&client_secret=");
         body.append(clientSecret);
-        
-        HttpURLConnection conn=(HttpURLConnection)url.openConnection();
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
 
-        conn.setDoInput(true);
-        conn.setDoOutput(true);
-        conn.connect();
-        conn.getOutputStream().write(body.toString().getBytes());
+        r.put("RequestURL", url);
+        int csIdx=body.indexOf(clientSecret);
+        r.put("RequestBody", body.substring(0,csIdx)+"<CLIENT_SECRET>"+body.substring(csIdx+clientSecret.length()));
 
-        Map<String, Object> r = new LinkedHashMap<String, Object>();
-        r.put("headers", conn.getHeaderFields());
-        r.put("code", conn.getResponseCode());
-        r.put("message", conn.getResponseMessage());
-        if (conn.getContentType() != null) {
-            r.put("contentLength", conn.getContentLength());
-            r.put("contentEncoding", conn.getContentEncoding());
-            r.put("contentType", conn.getContentType());
+        try {
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
 
-            Object obj = conn.getContent();
-            if (obj instanceof InputStream) {
-                InputStream is = (InputStream) obj;
-                ByteArrayOutputStream os = new ByteArrayOutputStream();
-                byte[] buf = new byte[1024];
-                int c = 0;
-                while ((c = is.read(buf)) != -1) {
-                    os.write(buf, 0, c);
+            conn.setDoInput(true);
+            conn.setDoOutput(true);
+            conn.connect();
+            conn.getOutputStream().write(body.toString().getBytes());
+
+            r.put("headers", conn.getHeaderFields());
+            r.put("code", conn.getResponseCode());
+            r.put("message", conn.getResponseMessage());
+            if (conn.getContentType() != null) {
+                r.put("contentLength", conn.getContentLength());
+                r.put("contentEncoding", conn.getContentEncoding());
+                r.put("contentType", conn.getContentType());
+
+                Object obj = conn.getContent();
+                if (obj instanceof InputStream) {
+                    InputStream is = (InputStream) obj;
+                    ByteArrayOutputStream os = new ByteArrayOutputStream();
+                    byte[] buf = new byte[1024];
+                    int c = 0;
+                    while ((c = is.read(buf)) != -1) {
+                        os.write(buf, 0, c);
+                    }
+                    obj = os.toByteArray();
+                    is.close();
                 }
-                obj = os.toByteArray();
-                is.close();
+                r.put("content", obj);
             }
-            r.put("content", obj);
+        } catch (Throwable th) {
+            StringWriter sw = new StringWriter();
+            th.printStackTrace(new PrintWriter(sw));
+            r.put("Exception", sw.getBuffer().toString());
         }
-        
+
         return r;
     }
 
