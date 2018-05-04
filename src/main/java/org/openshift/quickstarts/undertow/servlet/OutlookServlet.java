@@ -47,7 +47,8 @@ public class OutlookServlet extends HttpServlet {
     protected void doGet(final HttpServletRequest req, final HttpServletResponse resp)
             throws ServletException, IOException {
         if ("login".equals(m)) {
-            req.getRequestDispatcher(oa.getAuthURL().toString()).forward(req, resp);
+            //req.getRequestDispatcher(oa.getAuthURL().toString()).forward(req, resp);
+            resp.sendRedirect(oa.getAuthURL().toString());
             return;
         }
 
