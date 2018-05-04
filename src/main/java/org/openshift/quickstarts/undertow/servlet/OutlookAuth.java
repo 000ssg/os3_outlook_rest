@@ -19,14 +19,27 @@ public class OutlookAuth {
 
     String authUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
     String tokenUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
-    String roomsListUrl = "https://outlook.office.com/api/beta/me/findroomlists"; //"https://graph.microsoft.com/beta/me/findroomlists";//  "https://outlook.office.com/api/beta/me/findroomlists";
+
+    String apiBase= "https://graph.microsoft.com/";
+    String roomsListUrl = apiBase+"beta/me/findroomlists";
+    String messagesUrl=apiBase+"v1.0/me/messages?$select=subject,sender,receivedDateTime";
 
     String redirect = "https://openjdk-app-ddd.1d35.starter-us-east-1.openshiftapps.com/tokenized";
     String clientId;
     String clientSecret;
     String responseType = "code";
     String grantType = "authorization_code";
-    String scope = "openid+User.Read+Calendars.Read+Contacts.Read";
+    String scope = "openid"
+            +"+Calendars.Read"
+            +"+Contacts.Read"
+            +"+Device.Read"
+            +"+Files.Read"
+            +"+Mail.Read"
+            +"+People.Read"
+            +"+profile"
+            +"+Tasks.Read"
+            +"+User.Read"
+            ;
     //
     String code;
 
@@ -228,7 +241,7 @@ public class OutlookAuth {
     }
 
     public String messages(String token) throws IOException {
-        URL url = new URL("https://graph.microsoft.com/v1.0/me/mailfolders/inbox/messages?$select=subject,from,receivedDateTime&$top=25&$orderby=receivedDateTime%20DESC");
+        URL url = new URL(messagesUrl);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("GET");
         conn.setRequestProperty("Accept", "application/json");
@@ -303,19 +316,6 @@ public class OutlookAuth {
 
                 if (ct != null && (ct.toLowerCase().contains("text") || ct.toLowerCase().contains("json")) && obj instanceof byte[]) {
                     obj = new String((byte[]) obj, (ce != null) ? ce : "ISO-8859-1");
-
-                    String rm = (String) obj;
-                    int idx = rm.indexOf("\"access_token\"");
-                    if (idx != -1) {
-                        idx = rm.indexOf(":", idx);
-                    }
-                    if (idx != -1) {
-                        String at = rm.substring(idx + 2);
-                        idx = at.indexOf("\"");
-                        at = at.substring(0, idx);
-                        r.put("token", at);
-                    }
-
                 }
 
                 r.put("content", obj);
@@ -381,6 +381,9 @@ public class OutlookAuth {
         //oa.clientId="86b0f61c-2e69-41df-bdbe-49ebce3f7795";
         //oa.clientSecret="wGPTTH123+}@ojfukoJK03=";
 
+        at="eyJ0eXAiOiJKV1QiLCJub25jZSI6IkFRQUJBQUFBQUFEWDhHQ2k2SnM2U0s4MlRzRDJQYjdyYWN5elg0QkJ5ejhXVFk3bEJvMy11dEp0VDNKb2l1ZG5zejhKUDlVM0tWQ1d0VFJtM3RfVUpaME1CY1VCbzUwUWR1bFhRVE5HaHBQdXFycGdZNG1Od0NBQSIsImFsZyI6IlJTMjU2IiwieDV0IjoiaUJqTDFSY3F6aGl5NGZweEl4ZFpxb2hNMllrIiwia2lkIjoiaUJqTDFSY3F6aGl5NGZweEl4ZFpxb2hNMllrIn0.eyJhdWQiOiJodHRwczovL2dyYXBoLm1pY3Jvc29mdC5jb20iLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLm5ldC82ZmNlNGJiOC0zNTAxLTQxYzktYWZjYy1kYjBmYjUxYzdlM2QvIiwiaWF0IjoxNTI1NDYwNTMzLCJuYmYiOjE1MjU0NjA1MzMsImV4cCI6MTUyNTQ2NDQzMywiYWNyIjoiMSIsImFpbyI6IlkyZGdZSEI2dm45Wjl0clEyV3FXOHl6a0JBUnppa1ZPNjhtOGJ5dVBrSDc1ZGNXT0srWUEiLCJhbXIiOlsicHdkIl0sImFwcF9kaXNwbGF5bmFtZSI6InRlc3Qgb3V0bG9vayByZXN0IiwiYXBwaWQiOiI4NmIwZjYxYy0yZTY5LTQxZGYtYmRiZS00OWViY2UzZjc3OTUiLCJhcHBpZGFjciI6IjEiLCJmYW1pbHlfbmFtZSI6IlNpZG9yb3YiLCJnaXZlbl9uYW1lIjoiU2VyZ2V5IiwiaXBhZGRyIjoiMjEzLjI0My4xMjguMTMiLCJuYW1lIjoiU2lkb3JvdiBTZXJnZXkiLCJvaWQiOiJiMTEzMTM5NS1mOTUwLTQxYmItYmQ1Zi05NjlhYjJhZDM2ZjciLCJvbnByZW1fc2lkIjoiUy0xLTUtMjEtMjQzMDY3MTQ2Mi0yODUyOTcxNTUxLTI3OTYwMTEwNTUtMjE0NTIiLCJwbGF0ZiI6IjMiLCJwdWlkIjoiMTAwMzAwMDA4OTMxQjUzMSIsInNjcCI6Ik1haWwuUmVhZCBVc2VyLlJlYWQgQ2FsZW5kYXJzLlJlYWQgQ29udGFjdHMuUmVhZCIsInNpZ25pbl9zdGF0ZSI6WyJrbXNpIl0sInN1YiI6ImJnTmxJUjllaGJ6ajFpT1NORWZFV0YySWZxaHloM0NuNlF4Y2d6LWpaejgiLCJ0aWQiOiI2ZmNlNGJiOC0zNTAxLTQxYzktYWZjYy1kYjBmYjUxYzdlM2QiLCJ1bmlxdWVfbmFtZSI6InNlcmdleS5zaWRvcm92QGRpZ2lhLmNvbSIsInVwbiI6InNlcmdleS5zaWRvcm92QGRpZ2lhLmNvbSIsInV0aSI6Inh6OC1zRXBnNkVlS09NRG4wNjBMQUEiLCJ2ZXIiOiIxLjAifQ.CZ8OCwFE_Cgxk2PWyH-BCrpKQhyrSqD2OfN3Oat0yDLvsnsXnfQ4cKaue1iflp29DRRE2fm57Ub2_uuC9k0OkLa3cmKB1aeKeWdfyeLqVRjXay5hFO9Mg44en5t5JritYZn-3MemZFZFN61n1mlmeOPaJGEYXADiAuLI4azT49GXalGAxoBQ6CO0kke5t10E4zcFSU1u0BW4-ZtCkIiqbpntfOTti164ovsvcpwws_jDrTFVDkmdjv0zDT8M6juihGBoaqJilHQToBiXM-0WW_UMocoEFdy_CVWhQZzWbjPQNn833uDeTS-JY3zcfCw111EmywWNpf6BnoXGUTUBvA";
+        it=at;
+        
         for (String[] token2 : new String[][]{{"access", at}, {"id", it}}) {
             System.out.println("TOKEN: " + token2[0] + " -> " + token2[1]);
             try {
