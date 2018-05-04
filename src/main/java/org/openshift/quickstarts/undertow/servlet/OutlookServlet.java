@@ -23,7 +23,7 @@ public class OutlookServlet extends HttpServlet {
     private String u;
     private String p;
 
-    OutlookAuth oa=new OutlookAuth("86b0f61c-2e69-41df-bdbe-49ebce3f7795");
+    OutlookAuth oa = new OutlookAuth("86b0f61c-2e69-41df-bdbe-49ebce3f7795");
     String outlookToken;
 
     @Override
@@ -46,12 +46,11 @@ public class OutlookServlet extends HttpServlet {
     @Override
     protected void doGet(final HttpServletRequest req, final HttpServletResponse resp)
             throws ServletException, IOException {
-        if("login".equals(m)) {
-            resp.encodeRedirectURL(oa.getAuthURL().toString());
+        if ("login".equals(m)) {
+            req.getRequestDispatcher(oa.getAuthURL().toString()).forward(req, resp);
             return;
         }
-        
-        
+
         PrintWriter writer = resp.getWriter();
         writer.write("<html><header>");
         writer.write("</header><body>");
@@ -84,7 +83,7 @@ public class OutlookServlet extends HttpServlet {
             }
         } catch (Throwable th) {
         }
-        
+
         try {
             writer.write("\n  RemoteAddr=" + req.getRemoteAddr());
             writer.write("\n  RemotePort=" + req.getRemotePort());

@@ -54,14 +54,14 @@ public class ServletServer {
 									.addMapping("/*"),
 							servlet("MyServlet", MessageServlet.class).addInitParam("message", "MyServlet")
 									.addMapping("/myservlet"),
-							servlet("OutlookServlet", OutlookServlet.class)
+							servlet("OutlookServletT1", OutlookServlet.class)
 									.addInitParam(OutlookServlet.M, "init")
 									.addInitParam(OutlookServlet.U, "sergey.sidorov@digia.com")
 									.addMapping("/tokenize"),
-							servlet("OutlookServlet", OutlookServlet.class)
+							servlet("OutlookServletT2", OutlookServlet.class)
 									.addInitParam(OutlookServlet.M, "token")
 									.addMapping("/tokenized"),
-							servlet("OutlookServlet", OutlookServlet.class)
+							servlet("OutlookServletT3", OutlookServlet.class)
 									.addInitParam(OutlookServlet.M, "login")
 									.addMapping("/login")
 
