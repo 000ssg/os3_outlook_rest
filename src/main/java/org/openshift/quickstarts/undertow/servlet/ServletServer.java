@@ -50,7 +50,7 @@ public class ServletServer {
 
 			DeploymentInfo servletBuilder = deployment().setClassLoader(ServletServer.class.getClassLoader())
 					.setContextPath(MYAPP).setDeploymentName("test.war").addServlets(
-							servlet("MessageServlet", MessageServlet.class).addInitParam("message", "Hello World")
+							servlet("MessageServlet", MessageServlet.class).addInitParam("message", "Hello World: <a href='/login'>login link</a>")
 									.addMapping("/*"),
 							servlet("MyServlet", MessageServlet.class).addInitParam("message", "MyServlet")
 									.addMapping("/myservlet"),
