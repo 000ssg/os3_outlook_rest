@@ -60,7 +60,10 @@ public class ServletServer {
 									.addMapping("/tokenize"),
 							servlet("OutlookServlet", OutlookServlet.class)
 									.addInitParam(OutlookServlet.M, "token")
-									.addMapping("/tokenized")
+									.addMapping("/tokenized"),
+							servlet("OutlookServlet", OutlookServlet.class)
+									.addInitParam(OutlookServlet.M, "login")
+									.addMapping("/login")
 
 			);
 

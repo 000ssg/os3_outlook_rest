@@ -23,6 +23,7 @@ public class OutlookServlet extends HttpServlet {
     private String u;
     private String p;
 
+    OutlookAuth oa=new OutlookAuth("86b0f61c-2e69-41df-bdbe-49ebce3f7795");
     String outlookToken;
 
     @Override
@@ -45,6 +46,12 @@ public class OutlookServlet extends HttpServlet {
     @Override
     protected void doGet(final HttpServletRequest req, final HttpServletResponse resp)
             throws ServletException, IOException {
+        if("login".equals(m)) {
+            resp.encodeRedirectURL(oa.getAuthURL().toString());
+            return;
+        }
+        
+        
         PrintWriter writer = resp.getWriter();
         writer.write("<html><header>");
         writer.write("</header><body>");
