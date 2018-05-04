@@ -376,7 +376,7 @@ public class OutlookAuth {
         String at = (String) m.get("access_token");
         String it = (String) m.get("id_token");
 
-        com.sun.org.apache.xml.internal.security.Init.init();
+        //com.sun.org.apache.xml.internal.security.Init.init();
         OutlookAuth oa = new OutlookAuth("86b0f61c-2e69-41df-bdbe-49ebce3f7795");
         //oa.clientId="86b0f61c-2e69-41df-bdbe-49ebce3f7795";
         //oa.clientSecret="wGPTTH123+}@ojfukoJK03=";
