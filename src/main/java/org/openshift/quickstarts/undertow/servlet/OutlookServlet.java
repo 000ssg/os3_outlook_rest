@@ -55,7 +55,10 @@ public class OutlookServlet extends HttpServlet {
         } else if ("token".equals(m)) {
             oa.clientSecret = "wGPTTH123+}@ojfukoJK03=";
             Map<String, Object> tresp = oa.requestToken("" + req.getParameter("code"));
-            extra="Extra:\n"+tresp;
+            extra = "Extra:\n";
+            for (Map.Entry entry : tresp.entrySet()) {
+                extra += "\n  " + entry.getKey() + ": " + ("" + entry.getValue()).replace("\n", "\n  ");
+            }
         }
 
         PrintWriter writer = resp.getWriter();
