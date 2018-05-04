@@ -58,54 +58,88 @@ public class OutlookServlet extends HttpServlet {
         writer.write("");
         writer.write("<pre>");
         writer.write("Request:");
-        writer.write("\n  RequestURL="+req.getRequestURL());
-        writer.write("\n  Protocol="+req.getProtocol());
-        writer.write("\n  Scheme="+req.getScheme());
-        writer.write("\n  ServerName="+req.getServerName());
-        writer.write("\n  ServerPort="+req.getServerPort());
-        writer.write("\n  PathInfo="+req.getPathInfo());
-        writer.write("\n  PathTranslated="+req.getPathTranslated());
-        writer.write("\n  ServletPath="+req.getServletPath());
-        writer.write("\n  ContextPath="+req.getContextPath());
-        writer.write("\n  QueryString="+req.getQueryString());
+        try {
+            writer.write("\n  RequestURL=" + req.getRequestURL());
+            writer.write("\n  Protocol=" + req.getProtocol());
+            writer.write("\n  Scheme=" + req.getScheme());
+            writer.write("\n  ServerName=" + req.getServerName());
+            writer.write("\n  ServerPort=" + req.getServerPort());
+            writer.write("\n  PathInfo=" + req.getPathInfo());
+            writer.write("\n  PathTranslated=" + req.getPathTranslated());
+            writer.write("\n  ServletPath=" + req.getServletPath());
+            writer.write("\n  ContextPath=" + req.getContextPath());
+            writer.write("\n  QueryString=" + req.getQueryString());
+            try {
+                writer.write("\n  LocalAddr=" + req.getLocalAddr());
+                writer.write("\n  LocalPort=" + req.getLocalPort());
+                writer.write("\n  LocalName=" + req.getLocalName());
+            } catch (Throwable th) {
+            }
+        } catch (Throwable th) {
+        }
         
-        writer.write("\n  LocalAddr="+req.getLocalAddr());
-        writer.write("\n  LocalPort="+req.getLocalPort());
-        writer.write("\n  LocalName="+req.getLocalName());
-        
-        writer.write("\n  RemoteAddr="+req.getRemoteAddr());
-        writer.write("\n  RemotePort="+req.getRemotePort());
-        writer.write("\n  RemoteHost="+req.getRemoteHost());
-        writer.write("\n  RemoteUser="+req.getRemoteUser());
+        try {
+            writer.write("\n  RemoteAddr=" + req.getRemoteAddr());
+            writer.write("\n  RemotePort=" + req.getRemotePort());
+            writer.write("\n  RemoteHost=" + req.getRemoteHost());
+            writer.write("\n  RemoteUser=" + req.getRemoteUser());
+        } catch (Throwable th) {
+        }
 
-        writer.write("\n  Method="+req.getMethod());
-        writer.write("\n  RequestedSessionId="+req.getRequestedSessionId());
-        writer.write("\n  AuthType="+req.getAuthType());
-        
-        writer.write("\n  CharacterEncoding="+req.getCharacterEncoding());
-        writer.write("\n  ContentType="+req.getContentType());
-        writer.write("\n  ContentLengthLong="+req.getContentLengthLong());
-        writer.write("\n  Locale="+req.getLocale());
-        
-        List<String> hns = Collections.list(req.getHeaderNames());
-        writer.write("\n  headers(" + hns.size() + "): " + hns);
-        for (String hn : hns) {
-            writer.write("\n    "+hn+": "+(""+Collections.list(req.getHeaders(hn))).replace("\n", "\n    "));
+        try {
+            writer.write("\n  Method=" + req.getMethod());
+            writer.write("\n  RequestedSessionId=" + req.getRequestedSessionId());
+        } catch (Throwable th) {
         }
-        List<String> pns = Collections.list(req.getParameterNames());
-        writer.write("\n  parameters(" + pns.size() + "): " + pns);
-        for (String pn : pns) {
-            String[] pvs=req.getParameterValues(pn);
-            writer.write("\n    "+pn+": "+(""+((pvs!=null) ? Arrays.asList(pvs) : "")).replace("\n", "\n    "));
+
+        try {
+            writer.write("\n  AuthType=" + req.getAuthType());
+        } catch (Throwable th) {
         }
-        List<String> ans = Collections.list(req.getAttributeNames());
-        writer.write("\n  attributes(" + ans.size() + "): " + ans);
-        for (String an : ans) {
-            writer.write("\n    "+an+": "+(""+req.getAttribute(an)).replace("\n", "\n    "));
+
+        writer.write("\n  CharacterEncoding=" + req.getCharacterEncoding());
+        writer.write("\n  ContentType=" + req.getContentType());
+        writer.write("\n  ContentLengthLong=" + req.getContentLengthLong());
+        writer.write("\n  Locale=" + req.getLocale());
+
+        try {
+            List<String> hns = Collections.list(req.getHeaderNames());
+            writer.write("\n  headers(" + hns.size() + "): " + hns);
+            for (String hn : hns) {
+                writer.write("\n    " + hn + ": " + ("" + Collections.list(req.getHeaders(hn))).replace("\n", "\n    "));
+            }
+        } catch (Throwable th) {
         }
-        writer.write("\n  AsyncContext="+(""+req.getAsyncContext()).replace("\n", "\n  "));
-        Cookie[] cqs=req.getCookies();
-        writer.write("\n  Cookies="+((cqs!=null) ? ""+Arrays.asList(cqs) : "").replace("\n", "\n  "));
+
+        try {
+            List<String> pns = Collections.list(req.getParameterNames());
+            writer.write("\n  parameters(" + pns.size() + "): " + pns);
+            for (String pn : pns) {
+                String[] pvs = req.getParameterValues(pn);
+                writer.write("\n    " + pn + ": " + ("" + ((pvs != null) ? Arrays.asList(pvs) : "")).replace("\n", "\n    "));
+            }
+        } catch (Throwable th) {
+        }
+
+        try {
+            List<String> ans = Collections.list(req.getAttributeNames());
+            writer.write("\n  attributes(" + ans.size() + "): " + ans);
+            for (String an : ans) {
+                writer.write("\n    " + an + ": " + ("" + req.getAttribute(an)).replace("\n", "\n    "));
+            }
+        } catch (Throwable th) {
+        }
+
+        try {
+            writer.write("\n  AsyncContext=" + ("" + req.getAsyncContext()).replace("\n", "\n  "));
+        } catch (Throwable th) {
+        }
+
+        try {
+            Cookie[] cqs = req.getCookies();
+            writer.write("\n  Cookies=" + ((cqs != null) ? "" + Arrays.asList(cqs) : "").replace("\n", "\n  "));
+        } catch (Throwable th) {
+        }
         writer.write("</pre>");
         writer.write("");
         writer.write("");
