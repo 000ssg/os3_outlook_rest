@@ -19,7 +19,7 @@ public class OutlookAuth {
 
     String authUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
     String tokenUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
-    String roomsListUrl = "https://graph.microsoft.com/beta/me/findroomlists";//  "https://outlook.office.com/api/beta/me/findroomlists";
+    String roomsListUrl = "https://outlook.office.com/api/beta/me/findroomlists"; //"https://graph.microsoft.com/beta/me/findroomlists";//  "https://outlook.office.com/api/beta/me/findroomlists";
 
     String redirect = "https://openjdk-app-ddd.1d35.starter-us-east-1.openshiftapps.com/tokenized";
     String clientId;
