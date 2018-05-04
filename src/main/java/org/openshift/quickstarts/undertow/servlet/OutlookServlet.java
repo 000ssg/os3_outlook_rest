@@ -5,6 +5,7 @@ import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -46,10 +47,15 @@ public class OutlookServlet extends HttpServlet {
     @Override
     protected void doGet(final HttpServletRequest req, final HttpServletResponse resp)
             throws ServletException, IOException {
+        String extra = "";
         if ("login".equals(m)) {
             //req.getRequestDispatcher(oa.getAuthURL().toString()).forward(req, resp);
             resp.sendRedirect(oa.getAuthURL().toString());
             return;
+        } else if ("tokenized".equals(m)) {
+            oa.clientSecret = "wGPTTH123+}@ojfukoJK03=";
+            Map<String, Object> tresp = oa.requestToken("" + req.getParameter("code"));
+            extra="Extra:\n"+tresp;
         }
 
         PrintWriter writer = resp.getWriter();
@@ -62,7 +68,12 @@ public class OutlookServlet extends HttpServlet {
         writer.write("<tr><th>User</th><td><input type='text' name='user' value='" + u + "'></td></tr>");
         writer.write("</table>");
         writer.write("</form>");
-        writer.write("");
+        writer.write("<br/>");
+        writer.write("Extra:");
+        writer.write("<pre>");
+        writer.write(extra);
+        writer.write("</pre>");
+        writer.write("<br/>");
         writer.write("<pre>");
         writer.write("Request:");
         try {

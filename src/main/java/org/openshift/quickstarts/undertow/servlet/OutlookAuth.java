@@ -16,7 +16,9 @@ public class OutlookAuth {
     String tokenUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
     String redirect = "https://openjdk-app-ddd.1d35.starter-us-east-1.openshiftapps.com/tokenized";
     String clientId;
+    String clientSecret;
     String responseType = "code";
+    String grantType = "authorization_code";
     String scope = "openid+Mail.Read";
     //
     String code;
@@ -44,13 +46,7 @@ public class OutlookAuth {
     }
 
     public boolean doAuth() throws IOException {
-        URL url = new URL(
-                authUrl
-                + "?client_id=" + URLEncoder.encode(clientId, "UTF-8")
-                + "&redirect_uri=" + URLEncoder.encode(redirect, "UTF-8")
-                + "&response_type=" + responseType
-                + "&scope=" + scope
-        );
+        URL url = getAuthURL();
 
         System.out.println("doAuth: " + url);
         Map<String, Object> data = doGet(url);
@@ -71,8 +67,54 @@ public class OutlookAuth {
         return false;
     }
 
-    public String requestToken() throws IOException {
-        return null;
+    public Map<String, Object> requestToken(String code) throws IOException {
+        URL url=new URL(tokenUrl);
+        StringBuilder body=new StringBuilder();
+        body.append("grant_type=");
+        body.append(grantType);
+        body.append("&code=");
+        body.append(code);
+        body.append("&redirect_uri=");
+        body.append(URLEncoder.encode(redirect, "UTF-8"));
+        body.append("&client_id=");
+        body.append(clientId);
+        body.append("&client_secret=");
+        body.append(clientSecret);
+        
+        HttpURLConnection conn=(HttpURLConnection)url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+
+        conn.setDoInput(true);
+        conn.setDoOutput(true);
+        conn.connect();
+        conn.getOutputStream().write(body.toString().getBytes());
+
+        Map<String, Object> r = new LinkedHashMap<String, Object>();
+        r.put("headers", conn.getHeaderFields());
+        r.put("code", conn.getResponseCode());
+        r.put("message", conn.getResponseMessage());
+        if (conn.getContentType() != null) {
+            r.put("contentLength", conn.getContentLength());
+            r.put("contentEncoding", conn.getContentEncoding());
+            r.put("contentType", conn.getContentType());
+
+            Object obj = conn.getContent();
+            if (obj instanceof InputStream) {
+                InputStream is = (InputStream) obj;
+                ByteArrayOutputStream os = new ByteArrayOutputStream();
+                byte[] buf = new byte[1024];
+                int c = 0;
+                while ((c = is.read(buf)) != -1) {
+                    os.write(buf, 0, c);
+                }
+                obj = os.toByteArray();
+                is.close();
+            }
+            r.put("content", obj);
+        }
+        
+        return r;
     }
 
     ////////////////////////////////////////////////////////////////////////////
