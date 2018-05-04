@@ -2,67 +2,122 @@ package org.openshift.quickstarts.undertow.servlet;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 public class OutlookServlet extends HttpServlet {
-	public static final String M = "m";
-	public static final String U = "u";
-	public static final String P = "p";
 
-	private String m;
-	private String u;
-	private String p;
+    public static final String M = "m";
+    public static final String U = "u";
+    public static final String P = "p";
 
-	String outlookToken;
+    private String m;
+    private String u;
+    private String p;
 
-	@Override
-	public void init(final ServletConfig config) throws ServletException {
-		super.init(config);
-		try {
-			m = config.getInitParameter(M);
-		} catch (Throwable th) {
-		}
-		try {
-			u = config.getInitParameter(U);
-		} catch (Throwable th) {
-		}
-		try {
-			p = config.getInitParameter(P);
-		} catch (Throwable th) {
-		}
-	}
+    String outlookToken;
 
-	@Override
-	protected void doGet(final HttpServletRequest req, final HttpServletResponse resp)
-			throws ServletException, IOException {
-		PrintWriter writer = resp.getWriter();
-		writer.write("<html>header>");
-		writer.write("</header><body>");
-		writer.write("<h1>Outlook OAuth test</h1>");
-		writer.write("<form method='POST'>");
-		writer.write("<table><caption>Outlook login</caption>");
-		writer.write("<tr><th>User</th><td><input type='text' name='user' value='" + u + "'></td></tr>");
-		writer.write("<tr><th>User</th><td><input type='text' name='user' value='" + u + "'></td></tr>");
-		writer.write("</table>");
-		writer.write("</form>");
-		writer.write("");
-		writer.write("");
-		writer.write("");
-		writer.write("");
-		writer.write("");
-		writer.write("</body></html>");
-		writer.close();
-	}
+    @Override
+    public void init(final ServletConfig config) throws ServletException {
+        super.init(config);
+        try {
+            m = config.getInitParameter(M);
+        } catch (Throwable th) {
+        }
+        try {
+            u = config.getInitParameter(U);
+        } catch (Throwable th) {
+        }
+        try {
+            p = config.getInitParameter(P);
+        } catch (Throwable th) {
+        }
+    }
 
-	@Override
-	protected void doPost(final HttpServletRequest req, final HttpServletResponse resp)
-			throws ServletException, IOException {
-		doGet(req, resp);
-	}
+    @Override
+    protected void doGet(final HttpServletRequest req, final HttpServletResponse resp)
+            throws ServletException, IOException {
+        PrintWriter writer = resp.getWriter();
+        writer.write("<html><header>");
+        writer.write("</header><body>");
+        writer.write("<h1>Outlook OAuth test</h1>");
+        writer.write("<form method='POST'>");
+        writer.write("<table><caption>Outlook login (" + m + ")</caption>");
+        writer.write("<tr><th>User</th><td><input type='text' name='user' value='" + u + "'></td></tr>");
+        writer.write("<tr><th>User</th><td><input type='text' name='user' value='" + u + "'></td></tr>");
+        writer.write("</table>");
+        writer.write("</form>");
+        writer.write("");
+        writer.write("<pre>");
+        writer.write("Request:");
+        writer.write("\n  RequestURL="+req.getRequestURL());
+        writer.write("\n  Protocol="+req.getProtocol());
+        writer.write("\n  Scheme="+req.getScheme());
+        writer.write("\n  ServerName="+req.getServerName());
+        writer.write("\n  ServerPort="+req.getServerPort());
+        writer.write("\n  PathInfo="+req.getPathInfo());
+        writer.write("\n  PathTranslated="+req.getPathTranslated());
+        writer.write("\n  ServletPath="+req.getServletPath());
+        writer.write("\n  ContextPath="+req.getContextPath());
+        writer.write("\n  QueryString="+req.getQueryString());
+        
+        writer.write("\n  LocalAddr="+req.getLocalAddr());
+        writer.write("\n  LocalPort="+req.getLocalPort());
+        writer.write("\n  LocalName="+req.getLocalName());
+        
+        writer.write("\n  RemoteAddr="+req.getRemoteAddr());
+        writer.write("\n  RemotePort="+req.getRemotePort());
+        writer.write("\n  RemoteHost="+req.getRemoteHost());
+        writer.write("\n  RemoteUser="+req.getRemoteUser());
+
+        writer.write("\n  Method="+req.getMethod());
+        writer.write("\n  RequestedSessionId="+req.getRequestedSessionId());
+        writer.write("\n  AuthType="+req.getAuthType());
+        
+        writer.write("\n  CharacterEncoding="+req.getCharacterEncoding());
+        writer.write("\n  ContentType="+req.getContentType());
+        writer.write("\n  ContentLengthLong="+req.getContentLengthLong());
+        writer.write("\n  Locale="+req.getLocale());
+        
+        List<String> hns = Collections.list(req.getHeaderNames());
+        writer.write("\n  headers(" + hns.size() + "): " + hns);
+        for (String hn : hns) {
+            writer.write("\n    "+hn+": "+(""+Collections.list(req.getHeaders(hn))).replace("\n", "\n    "));
+        }
+        List<String> pns = Collections.list(req.getParameterNames());
+        writer.write("\n  parameters(" + pns.size() + "): " + pns);
+        for (String pn : pns) {
+            String[] pvs=req.getParameterValues(pn);
+            writer.write("\n    "+pn+": "+(""+((pvs!=null) ? Arrays.asList(pvs) : "")).replace("\n", "\n    "));
+        }
+        List<String> ans = Collections.list(req.getAttributeNames());
+        writer.write("\n  attributes(" + ans.size() + "): " + ans);
+        for (String an : ans) {
+            writer.write("\n    "+an+": "+(""+req.getAttribute(an)).replace("\n", "\n    "));
+        }
+        writer.write("\n  AsyncContext="+(""+req.getAsyncContext()).replace("\n", "\n  "));
+        Cookie[] cqs=req.getCookies();
+        writer.write("\n  Cookies="+((cqs!=null) ? ""+Arrays.asList(cqs) : "").replace("\n", "\n  "));
+        writer.write("</pre>");
+        writer.write("");
+        writer.write("");
+        writer.write("");
+        writer.write("</body></html>");
+        writer.close();
+    }
+
+    @Override
+    protected void doPost(final HttpServletRequest req, final HttpServletResponse resp)
+            throws ServletException, IOException {
+        doGet(req, resp);
+    }
 
 }

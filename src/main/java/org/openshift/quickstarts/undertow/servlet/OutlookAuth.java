@@ -14,7 +14,7 @@ public class OutlookAuth {
 
 	    String authUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
 	    String tokenUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
-	    String redirect = "https://digia.com";
+	    String redirect = "https://openjdk-app-ddd.1d35.starter-us-east-1.openshiftapps.com/tokenized";
 	    String clientId;
 	    String responseType = "code";
 	    String scope = "openid+Mail.Read";
