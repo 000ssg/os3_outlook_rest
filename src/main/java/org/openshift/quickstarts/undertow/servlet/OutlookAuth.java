@@ -98,6 +98,7 @@ public class OutlookAuth {
             conn.setDoOutput(true);
             conn.connect();
             conn.getOutputStream().write(body.toString().getBytes());
+            conn.getOutputStream().close();
 
             r.put("headers", conn.getHeaderFields());
             r.put("code", conn.getResponseCode());
