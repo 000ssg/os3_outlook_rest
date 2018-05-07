@@ -65,13 +65,22 @@ public class OutlookServlet extends HttpServlet {
             if (tresp.containsKey("token")) {
                 req.getSession().setAttribute("token_type", tresp.get("token_type"));
                 req.getSession().setAttribute("token", tresp.get("token"));
+                req.getSession().setAttribute("roomLists", null);
             }
         } else if ("roomslists".equals(m)) {
+            RoomLists rl = null;
             try {
-                RoomLists rl = oa.fetchRooms((String) req.getSession().getAttribute("token"), TIME_PERIOD.today);
-                extra = "Rooms lists:\n  " + ("" + rl).replace("\n", "\n  ");
+                rl = (RoomLists) req.getSession().getAttribute("roomLists");
             } catch (Throwable th) {
-                extra = "Rooms lists: ERROR:\n  " + th;
+            }
+            if (rl == null) {
+                try {
+                    rl = oa.fetchRooms((String) req.getSession().getAttribute("token"), TIME_PERIOD.today);
+                    req.getSession().setAttribute("roomLists", rl);
+                    extra = "Rooms lists:\n  " + ("" + rl).replace("\n", "\n  ");
+                } catch (Throwable th) {
+                    extra = "Rooms lists: ERROR:\n  " + th;
+                }
             }
         } else if ("messages".equals(m)) {
             String rrl = null;

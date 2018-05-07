@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.io.Serializable;
 import java.io.StringWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -486,8 +487,8 @@ public class OutlookAuth {
         return roomLists;
     }
 
-    public RoomLists fetchRooms(String token, TIME_PERIOD period) throws IOException {
-        RoomLists r = roomsLists(token);
+    public RoomLists fetchRooms(final String token, final TIME_PERIOD period) throws IOException {
+        final RoomLists r = roomsLists(token);
         r.roomListsNS = System.nanoTime();
         r.roomListsC = r.lists.size();
         for (Entry<String, String> re : r.lists.entrySet()) {
@@ -500,35 +501,48 @@ public class OutlookAuth {
         r.roomsListNS = System.nanoTime();
 
         if (period != null) {
-            int days = 0;
-            switch (period) {
-                case today:
-                    days = 1;
-                    break;
-                case week:
-                    days = 7;
-                    break;
-                case forthnight:
-                    days = 14;
-                    break;
-                case month:
-                    days = 31;
-                    break;
-            }
-            for (Entry<String, List<Room>> re : r.rooms.entrySet()) {
-                if (re.getValue() != null) {
-                    for (Room room : re.getValue()) {
-                        List<TimeSlot> trs = eventsListDays(token, room, days);
-                        if (trs != null) {
-                            room.allocations.addAll(trs);
-                            r.timeSlotsC += trs.size();
+            Runnable run = new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        if (period != null) {
+                            int days = 0;
+                            switch (period) {
+                                case today:
+                                    days = 1;
+                                    break;
+                                case week:
+                                    days = 7;
+                                    break;
+                                case forthnight:
+                                    days = 14;
+                                    break;
+                                case month:
+                                    days = 31;
+                                    break;
+                            }
+                            for (Entry<String, List<Room>> re : r.rooms.entrySet()) {
+                                if (re.getValue() != null) {
+                                    for (Room room : re.getValue()) {
+                                        List<TimeSlot> trs = eventsListDays(token, room, days);
+                                        if (trs != null) {
+                                            room.allocations.addAll(trs);
+                                            r.timeSlotsC += trs.size();
+                                        }
+                                    }
+                                }
+                            }
                         }
+                    } catch (IOException ioex) {
                     }
-                }
-            }
-        }
-        r.timeSlotsNS = System.nanoTime();
+                    r.timeSlotsNS = System.nanoTime();
 
+                }
+            };
+            Thread th = new Thread(run);
+            th.setDaemon(true);
+            th.start();
+        }
         return r;
     }
 
@@ -958,7 +972,7 @@ public class OutlookAuth {
     }
 
 ////////////////////////////////////////////////////////////////////////////////    
-    public static class RoomLists {
+    public static class RoomLists implements Serializable {
 
         public String context;
         public Map<String, String> lists = new LinkedHashMap<String, String>();
@@ -975,7 +989,7 @@ public class OutlookAuth {
         long roomsListC = 0;
         long timeSlotsC = 0;
 
-        public static class Room {
+        public static class Room implements Serializable {
 
             public String name;
             public String address;
@@ -1008,7 +1022,7 @@ public class OutlookAuth {
             tsDTF.setTimeZone(TimeZone.getTimeZone("UTC"));
         }
 
-        public static class TimeSlot {
+        public static class TimeSlot implements Serializable {
 
             public long from;
             public long to;
@@ -1043,9 +1057,9 @@ public class OutlookAuth {
                 sb.append(", errorObject=" + errorObject);
             }
             sb.append("\n  Timing:");
-            sb.append("\n    room lists (" + roomListsC + ") " + (roomListsNS - createdNS) / 1000000f+"ms.");
-            sb.append("\n    rooms      (" + roomsListC + ") " + (roomsListNS - roomListsNS) / 1000000f+"ms.");
-            sb.append("\n    time slots (" + timeSlotsC + ") " + (timeSlotsNS - roomsListNS) / 1000000f+"ms.");
+            sb.append("\n    room lists (" + roomListsC + ") " + (roomListsNS - createdNS) / 1000000f + "ms.");
+            sb.append("\n    rooms      (" + roomsListC + ") " + (roomsListNS - roomListsNS) / 1000000f + "ms.");
+            sb.append("\n    time slots (" + timeSlotsC + ") " + (timeSlotsNS - roomsListNS) / 1000000f + "ms.");
             if (!lists.isEmpty()) {
                 sb.append("\nRoom lists:");
                 for (Entry<String, String> entry : lists.entrySet()) {
