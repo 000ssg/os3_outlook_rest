@@ -174,7 +174,9 @@ public class xJSON {
                     } else {
                         throw new IOException();
                     }
+                    break;
                 default:
+                    rdr.unread(ch);
                     l.add(read(rdr));
                     expectSeparator = true;
             }
