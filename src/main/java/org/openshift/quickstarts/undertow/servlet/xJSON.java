@@ -248,17 +248,4 @@ public class xJSON {
     public static <T> T read(InputStream is, String encoding) throws IOException {
         return read(new PushbackReader(new InputStreamReader(is, encoding)));
     }
-
-
-    static Map<String, DateFormat> dtfs = new HashMap<String, DateFormat>();
-
-    public static DateFormat getDTF(String timeZone) {
-        DateFormat df = dtfs.get(timeZone);
-        if (df == null) {
-            df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
-            df.setTimeZone(TimeZone.getTimeZone(timeZone));
-            dtfs.put(timeZone, df);
-        }
-        return df;
-    }
 }

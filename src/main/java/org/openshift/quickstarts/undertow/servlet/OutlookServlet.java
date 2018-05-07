@@ -15,6 +15,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import org.openshift.quickstarts.undertow.servlet.OutlookAuth.RoomLists;
+import org.openshift.quickstarts.undertow.servlet.OutlookAuth.TIME_PERIOD;
 
 public class OutlookServlet extends HttpServlet {
 
@@ -67,7 +68,7 @@ public class OutlookServlet extends HttpServlet {
             }
         } else if ("roomslists".equals(m)) {
             try {
-                RoomLists rl = oa.fetchRooms((String) req.getSession().getAttribute("token"));
+                RoomLists rl = oa.fetchRooms((String) req.getSession().getAttribute("token"), TIME_PERIOD.today);
                 extra = "Rooms lists:\n  " + ("" + rl).replace("\n", "\n  ");
             } catch (Throwable th) {
                 extra = "Rooms lists: ERROR:\n  " + th;
