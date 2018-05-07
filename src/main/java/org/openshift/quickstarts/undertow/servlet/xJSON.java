@@ -10,10 +10,15 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PushbackReader;
 import java.io.StringReader;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 
 /**
  *
@@ -29,6 +34,27 @@ public class xJSON {
                 case -1:
                     break;
                 case '\\':
+                    ch = rdr.read();
+                    switch (ch) {
+                        case 'n':
+                            sb.append('\n');
+                            break;
+                        case 'r':
+                            sb.append('\r');
+                            break;
+                        case 't':
+                            sb.append('\t');
+                            break;
+                        case 'b':
+                            sb.append('\b');
+                            break;
+                        case 'f':
+                            sb.append('\f');
+                            break;
+                        default:
+                            sb.append((char) ch);
+                            break;
+                    }
                     break;
                 default:
                     sb.append((char) ch);
@@ -223,4 +249,16 @@ public class xJSON {
         return read(new PushbackReader(new InputStreamReader(is, encoding)));
     }
 
+
+    static Map<String, DateFormat> dtfs = new HashMap<String, DateFormat>();
+
+    public static DateFormat getDTF(String timeZone) {
+        DateFormat df = dtfs.get(timeZone);
+        if (df == null) {
+            df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
+            df.setTimeZone(TimeZone.getTimeZone(timeZone));
+            dtfs.put(timeZone, df);
+        }
+        return df;
+    }
 }
