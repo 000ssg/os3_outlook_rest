@@ -22,7 +22,7 @@ import java.util.Map;
 public class xJSON {
 
     public static String readText(int EOT, PushbackReader rdr) throws IOException {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder(1024);
         int ch = 0;
         while ((ch = rdr.read()) != EOT) {
             switch (ch) {
@@ -45,6 +45,12 @@ public class xJSON {
                             break;
                         case 'f':
                             sb.append('\f');
+                            break;
+                        case 'u':
+                            // unicode
+                            char[] uch = new char[4];
+                            rdr.read(uch);
+                            sb.append((char) Integer.parseInt(new String(uch), 16));
                             break;
                         default:
                             sb.append((char) ch);
@@ -140,7 +146,7 @@ public class xJSON {
                     }
                     break;
                 case ',':
-                    if (key != null) {
+                    if (key != null || !expectSeparator) {
                         throw new IOException("Unexpected values separator: " + (char) ch + ", undefined name is '" + key + "'.");
                     }
                     expectSeparator = false;
@@ -193,7 +199,7 @@ public class xJSON {
                     if (expectSeparator) {
                         expectSeparator = false;
                     } else {
-                        throw new IOException();
+                        throw new IOException("Unexpected vzlues separator in list.");
                     }
                     break;
                 default:
