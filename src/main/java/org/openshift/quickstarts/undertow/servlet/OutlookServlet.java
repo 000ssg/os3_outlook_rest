@@ -73,13 +73,13 @@ public class OutlookServlet extends HttpServlet {
                 extra = "Rooms lists: ERROR:\n  " + th;
             }
         } else if ("messages".equals(m)) {
-            String rrl=null;
+            String rrl = null;
             try {
                 rrl = oa.messages((String) req.getSession().getAttribute("token"));
                 Map map = xJSON.read(rrl);
                 extra = "Messages:\n  " + Dump.dump(map, true, true).replace("\n", "\n  ");
             } catch (Throwable th) {
-                extra = "Rooms lists:\n"+rrl+"\n---  ERROR:\n  " + th;
+                extra = "Rooms lists:\n" + rrl + "\n---  ERROR:\n  " + th;
             }
         }
 
