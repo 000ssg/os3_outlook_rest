@@ -14,11 +14,9 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
-import org.codehaus.jackson.map.ObjectMapper;
 
 public class OutlookServlet extends HttpServlet {
 
-    public static ObjectMapper mapper = new ObjectMapper();
     public static final String M = "m";
     public static final String U = "u";
     public static final String P = "p";
@@ -69,7 +67,7 @@ public class OutlookServlet extends HttpServlet {
         } else if ("roomslists".equals(m)) {
             try {
                 String rrl = oa.roomsLists((String) req.getSession().getAttribute("token"));
-                Map map = mapper.readValue(rrl, Map.class);
+                Map map = xJSON.read(rrl);
                 extra = "Rooms lists:\n  " + Dump.dump(map, true, true).replace("\n", "\n  ");
             } catch (Throwable th) {
                 extra = "Rooms lists: ERROR:\n  " + th;
@@ -78,7 +76,7 @@ public class OutlookServlet extends HttpServlet {
             String rrl=null;
             try {
                 rrl = oa.messages((String) req.getSession().getAttribute("token"));
-                Map map = mapper.readValue(rrl, Map.class);
+                Map map = xJSON.read(rrl);
                 extra = "Messages:\n  " + Dump.dump(map, true, true).replace("\n", "\n  ");
             } catch (Throwable th) {
                 extra = "Rooms lists:\n"+rrl+"\n---  ERROR:\n  " + th;

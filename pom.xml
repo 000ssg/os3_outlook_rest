@@ -67,11 +67,6 @@
             <artifactId>jboss-logmanager</artifactId>
             <version>${version.jboss.logmanager}</version>
         </dependency>
-        <dependency>
-            <groupId>org.codehaus.jackson</groupId>
-            <artifactId>jackson-mapper-asl</artifactId>
-            <version>1.9.13.redhat-4</version>
-        </dependency>
     </dependencies>
 
     <profiles>
