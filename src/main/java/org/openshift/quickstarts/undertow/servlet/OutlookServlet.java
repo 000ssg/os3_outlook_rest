@@ -110,7 +110,24 @@ public class OutlookServlet extends HttpServlet {
         writer.write("<tr><th>User</th><td><input type='text' name='user' value='" + u + "'></td></tr>");
         writer.write("<tr><th>login</th><td><a href='/login'>LOGIN</a></td></tr>");
         writer.write("<tr><th>messages</th><td><a href='/messages'>MESSAGES</a></td></tr>");
-        writer.write("<tr><th>roomlists</th><td><a href='/roomslists'>ROOM LISTS</a></td></tr>");
+        writer.write("<tr><th>roomlists</th><td><a href='/roomslists'>ROOM LISTS</a>");
+        try {
+            RoomLists rl = (RoomLists) req.getSession().getAttribute("roomLists");
+            if (rl != null) {
+                writer.write("<pre>");
+                try {
+                    long[] range = rl.timeSlotsRange();
+                    range[0] = OutlookAuth.roundTimeHour(null, range[0], true);
+                    range[1] = OutlookAuth.roundTimeHour(null, range[1], false);
+                    writer.write("ASCII: " + rl.toASCII(null, range[0], range[1], 1000 * 60 * 15 * 2 / 6));
+                } catch (Throwable th) {
+                } finally {
+                    writer.write("</pre>");
+                }
+            }
+        } catch (Throwable th) {
+        }
+        writer.write("</td></tr>");
         writer.write("<tr><th>session</th><td><pre>");
         {
             HttpSession sess = req.getSession();
