@@ -5,7 +5,6 @@
  */
 package org.openshift.quickstarts.undertow.servlet;
 
-import com.sun.org.apache.xml.internal.security.utils.Base64;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -20,6 +19,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -294,7 +294,7 @@ public class xJSON {
                     .replace("\b", "\\b")
                     + '"');
         } else if (obj instanceof byte[]) {
-            writer.write('"' + Base64.encode((byte[]) obj) + '"');
+            writer.write('"' + Base64.getEncoder().encodeToString((byte[]) obj) + '"');
         } else if (obj instanceof Collection) {
             writer.write('[');
             boolean first = true;
