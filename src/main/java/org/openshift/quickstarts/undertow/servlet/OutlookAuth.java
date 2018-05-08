@@ -501,6 +501,7 @@ public class OutlookAuth {
         r.roomsListNS = System.nanoTime();
 
         if (period != null) {
+            r.fetching = true;
             Runnable run = new Runnable() {
                 @Override
                 public void run() {
@@ -534,9 +535,10 @@ public class OutlookAuth {
                             }
                         }
                     } catch (IOException ioex) {
+                    } finally {
+                        r.timeSlotsNS = System.nanoTime();
+                        r.fetching = false;
                     }
-                    r.timeSlotsNS = System.nanoTime();
-
                 }
             };
             Thread th = new Thread(run);
@@ -920,6 +922,40 @@ public class OutlookAuth {
         return eventsList(token, room, start, end, null);
     }
 
+    public static long today(TimeZone tz, Boolean start) {
+        if (tz == null) {
+            tz = TimeZone.getDefault();
+        }
+        Calendar c = Calendar.getInstance(tz);
+        if (start != null && start) {
+            c.set(Calendar.HOUR_OF_DAY, 0);
+            c.set(Calendar.MINUTE, 0);
+            c.set(Calendar.SECOND, 0);
+            c.set(Calendar.MILLISECOND, 0);
+        } else if (start != null && !start) {
+            c.set(Calendar.HOUR_OF_DAY, 23);
+            c.set(Calendar.MINUTE, 59);
+            c.set(Calendar.SECOND, 59);
+            c.set(Calendar.MILLISECOND, 999);
+        }
+        return c.getTimeInMillis();
+    }
+
+    public static long roundTimeHour(TimeZone tz, long time, boolean down) {
+        if (tz == null) {
+            tz = TimeZone.getDefault();
+        }
+        Calendar c = Calendar.getInstance(tz);
+        c.setTimeInMillis(time);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        if (!down) {
+            c.add(Calendar.HOUR_OF_DAY, 1);
+        }
+        return c.getTimeInMillis();
+    }
+
     ////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////// utilities
     ////////////////////////////////////////////////////////////////////////////
@@ -988,6 +1024,8 @@ public class OutlookAuth {
         long roomListsC = 0;
         long roomsListC = 0;
         long timeSlotsC = 0;
+
+        public transient boolean fetching = false;
 
         public static class Room implements Serializable {
 
@@ -1082,12 +1120,108 @@ public class OutlookAuth {
             return sb.toString();
         }
 
+        public long[] timeSlotsRange() {
+            long[] range = null;
+            for (Entry<String, List<Room>> rooms : rooms.entrySet()) {
+                for (Room r : rooms.getValue()) {
+                    for (TimeSlot ts : r.allocations) {
+                        if (range == null) {
+                            range = new long[]{ts.from, ts.to};
+                        } else {
+                            range[0] = Math.min(range[0], ts.from);
+                            range[1] = Math.max(range[1], ts.to);
+                        }
+                    }
+                }
+            }
+            if (range == null) {
+                range = new long[]{today(null, true), today(null, false)};
+            }
+            return range;
+        }
+
+        public String toASCII(TimeZone tz, long from, long to, long step) {
+            StringBuilder sb = new StringBuilder(1024);
+
+            if (tz == null) {
+                tz = TimeZone.getDefault();
+            }
+            DateFormat df = new SimpleDateFormat("MM-dd");
+            DateFormat tf = new SimpleDateFormat("HH:mm");
+            tf.setTimeZone(tz);
+
+            long[] time = new long[(int) ((to - from) / step) + 2];
+            time[0] = from;
+            for (int i = 1; i < time.length; i++) {
+                time[i] = time[i - 1] + step;
+            }
+
+            sb.append("Room allocations in " + tz.getDisplayName());
+            String scale = "";
+            Calendar c = Calendar.getInstance(tz);
+            if ((to - from) > 1000 * 60 * 60 * 24 * 1.2) {
+                for (int i = 0; i < time.length - 1; i++) {
+                    c.setTimeInMillis(time[i]);
+                    if (c.get(Calendar.MINUTE) == 0
+                            && c.get(Calendar.HOUR_OF_DAY) == 0) {
+                        scale += df.format(c.getTime());
+                        i += 4;
+                    } else {
+                        scale += '_';
+                    }
+                }
+                scale += '\n';
+            }
+            for (int i = 0; i < time.length - 1; i++) {
+                c.setTimeInMillis(time[i]);
+                if (i % 12 == 0) {
+                    //scale += '|';
+                    scale += tf.format(c.getTime());
+                    i += 4;
+                } else {
+                    scale += ' ';
+                }
+            }
+            scale += '\n';
+            for (int i = 0; i < time.length - 1; i++) {
+                c.setTimeInMillis(time[i]);
+                if (c.get(Calendar.MINUTE) == 0) {
+                    scale += '|';
+                } else {
+                    scale += '_';
+                }
+            }
+
+            for (Entry<String, List<Room>> rooms : rooms.entrySet()) {
+                sb.append('\n');
+                sb.append(rooms.getKey());
+                sb.append('\n');
+                sb.append(scale);
+                for (Room r : rooms.getValue()) {
+                    sb.append('\n');
+                    for (int i = 0; i < time.length - 1; i++) {
+                        boolean allocated = false;
+                        for (TimeSlot ts : r.allocations) {
+                            if (time[i] >= ts.from && time[i + 1] <= ts.to) {
+                                allocated = true;
+                                break;
+                            }
+                        }
+                        sb.append((allocated) ? "*" : ".");
+                    }
+                    sb.append("  " + r.name + "  " + r.address);
+                }
+            }
+
+            return sb.toString();
+        }
     }
 
     public static void main(String[] args) throws Exception {
         String ttt = "{\"token_type\":\"Bearer\",\"scope\":\"Mail.Read User.Read\",\"expires_in\":3599,\"ext_expires_in\":0,\"access_token\":\"eyJ0eXAiOiJKV1QiLCJub25jZSI6IkFRQUJBQUFBQUFEWDhHQ2k2SnM2U0s4MlRzRDJQYjdyOHhpR2tiQUIxZ2F2cHhPZjEtdDVkZG9CWHJtdGV6WVl5Y2gwTTFkeS1DQ1QtLVEwbmRmSF9QZjIyNk9iaXB4RmE2N0FNRlgxSmRJSzl5YllnQmRnVUNBQSIsImFsZyI6IlJTMjU2IiwieDV0IjoiaUJqTDFSY3F6aGl5NGZweEl4ZFpxb2hNMllrIiwia2lkIjoiaUJqTDFSY3F6aGl5NGZweEl4ZFpxb2hNMllrIn0.eyJhdWQiOiJodHRwczovL2dyYXBoLm1pY3Jvc29mdC5jb20iLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLm5ldC82ZmNlNGJiOC0zNTAxLTQxYzktYWZjYy1kYjBmYjUxYzdlM2QvIiwiaWF0IjoxNTI1NDMzODA5LCJuYmYiOjE1MjU0MzM4MDksImV4cCI6MTUyNTQzNzcwOSwiYWNyIjoiMSIsImFpbyI6IlkyZGdZSkI1RUIvQTBjdWxkWDdaT1o2WDBuci9FNUp1dEVhMS9GaHVyMUN5bWZHVDRsY0EiLCJhbXIiOlsicHdkIl0sImFwcF9kaXNwbGF5bmFtZSI6InRlc3Qgb3V0bG9vayByZXN0IiwiYXBwaWQiOiI4NmIwZjYxYy0yZTY5LTQxZGYtYmRiZS00OWViY2UzZjc3OTUiLCJhcHBpZGFjciI6IjEiLCJmYW1pbHlfbmFtZSI6IlNpZG9yb3YiLCJnaXZlbl9uYW1lIjoiU2VyZ2V5IiwiaXBhZGRyIjoiOTEuMjE3LjI0OC4xMSIsIm5hbWUiOiJTaWRvcm92IFNlcmdleSIsIm9pZCI6ImIxMTMxMzk1LWY5NTAtNDFiYi1iZDVmLTk2OWFiMmFkMzZmNyIsIm9ucHJlbV9zaWQiOiJTLTEtNS0yMS0yNDMwNjcxNDYyLTI4NTI5NzE1NTEtMjc5NjAxMTA1NS0yMTQ1MiIsInBsYXRmIjoiMyIsInB1aWQiOiIxMDAzMDAwMDg5MzFCNTMxIiwic2NwIjoiTWFpbC5SZWFkIFVzZXIuUmVhZCIsInNpZ25pbl9zdGF0ZSI6WyJpbmtub3dubnR3ayIsImttc2kiXSwic3ViIjoiYmdObElSOWVoYnpqMWlPU05FZkVXRjJJZnFoeWgzQ242UXhjZ3otalp6OCIsInRpZCI6IjZmY2U0YmI4LTM1MDEtNDFjOS1hZmNjLWRiMGZiNTFjN2UzZCIsInVuaXF1ZV9uYW1lIjoic2VyZ2V5LnNpZG9yb3ZAZGlnaWEuY29tIiwidXBuIjoic2VyZ2V5LnNpZG9yb3ZAZGlnaWEuY29tIiwidXRpIjoid01WaDduUW0xVTZiQTNRbEZGWUZBQSIsInZlciI6IjEuMCJ9.O2fKeeVKNCEqE9aJ-ODy8OH5chHGHv9gTnffx0bAyyqJEXFGgmZS11x_a0ahpWbS-Ro6dqKvI4m1iKFUN1cDoqByN8UbcRYsdgNG5rbZeM9sQUNXWWetQr_bxRMz-QL61II_cYywYBAM3SyYUgBmr6PUm_gGqPnmO9CR--mEhwpJDGG1_3-ZVthaBAQf-fqrVf4BoKVrGDpNs3CcCqmHdVQU8payV6E4l8T6jtY0i5fwEQlrxn7SwR_URB21yq8zu6pVgDJBOOCblkgof3H_cthJfIOREHBPKqebUVHt_1W0qCLFNNNpv4rd_k-0XoS4ctiVSX2fzPpucWXuzWleUw\",\"id_token\":\"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImlCakwxUmNxemhpeTRmcHhJeGRacW9oTTJZayJ9.eyJhdWQiOiI4NmIwZjYxYy0yZTY5LTQxZGYtYmRiZS00OWViY2UzZjc3OTUiLCJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vNmZjZTRiYjgtMzUwMS00MWM5LWFmY2MtZGIwZmI1MWM3ZTNkL3YyLjAiLCJpYXQiOjE1MjU0MzM4MDksIm5iZiI6MTUyNTQzMzgwOSwiZXhwIjoxNTI1NDM3NzA5LCJhaW8iOiJBVFFBeS84SEFBQUE4QUg1MFNLR0RWb1BBQ01WMXVTeWNxd2NXY1VsY2pFTVRNVDk3cFA4Vytnd05CUXRKeGw2cUtvRENjSFdmMVY3Iiwic3ViIjoiTENJWDFvSGpyNllfS1hHRFppQXY1NlVFenpLakNNX043S1pPc2hfUTg2YyIsInRpZCI6IjZmY2U0YmI4LTM1MDEtNDFjOS1hZmNjLWRiMGZiNTFjN2UzZCIsInV0aSI6IndNVmg3blFtMVU2YkEzUWxGRllGQUEiLCJ2ZXIiOiIyLjAifQ.X39q_gP2rCvm27Bn4u29_5YIc8Pd9Ecjz7zIkNXHDgseJN5UVKe1XP1U9ZVrRnuRfDxRRIbiRUkVPESBTXS-2q77UPG6jE6q762z8Pi0srD3UpiGJg4AneStkvXONb5j-ueVW0HuMZLsucTSm3Ht5nTRLWlkF5MTe-59ZcMt4PORx71H9s3IFunqsLQ_Uzja7-aSjSzGMAuUivfa0K_LgcHtEVBKUnoswTBB-lXMNP4T4bcR2Oy2CCAWgqheaNlQqgvIkm7__MDlKufH_FqgQJWwmDG2LCq-eEGSzIttteBm78W-Xc5PjPQF1WZCDv5Kmyj_kZkmsD1PS8Q-7j9K9g\"}";
         ttt = "{\"@odata.context\":\"https://graph.microsoft.com/beta/$metadata#Collection(microsoft.graph.emailAddress)\",\"value\":[{\"name\":\"Rooms-HKI-Atomitie2-FLR-A2\",\"address\":\"Rooms-HKI-Atomitie2-FLR-A2@digia.com\"},{\"name\":\"Rooms-HKI-Atomitie2-FLR-A3\",\"address\":\"Rooms-HKI-Atomitie2-FLR-A3@digia.com\"},{\"name\":\"Rooms-HKI-Atomitie2-FLR-A4\",\"address\":\"Rooms-HKI-Atomitie2-FLR-A4@digia.com\"},{\"name\":\"Rooms-HKI-Atomitie2-FLR-A5\",\"address\":\"Rooms-HKI-Atomitie2-FLR-A5@digia.com\"},{\"name\":\"Rooms-HKI-Atomitie2-FLR-A6\",\"address\":\"Rooms-HKI-Atomitie2-FLR-A6@digia.com\"},{\"name\":\"Rooms-HKI-Atomitie2-FLR-A7\",\"address\":\"Rooms-HKI-Atomitie2-FLR-A7@digia.com\"},{\"name\":\"Rooms-HKI-Atomitie2-FLR-B6\",\"address\":\"Rooms-HKI-Atomitie2-FLR-B6@digia.com\"},{\"name\":\"Rooms-HKI-Atomitie2-FLR-B7\",\"address\":\"Rooms-HKI-Atomitie2-FLR-B7@digia.com\"},{\"name\":\"Rooms-Jyvaskyla\",\"address\":\"Rooms-Jyvaskyla@digia.com\"},{\"name\":\"Rooms-Rauma\",\"address\":\"Rooms-Rauma@digia.com\"},{\"name\":\"Rooms-Tampere\",\"address\":\"Rooms-Tampere@digia.com\"},{\"name\":\"rooms-turku\",\"address\":\"rooms-turku@digia.com\"},{\"name\":\"Rooms-Vaasa\",\"address\":\"Rooms-Vaasa@digia.com\"}]}";
         Map m = xJSON.read(ttt);
+        String ms = xJSON.write(m);
 
         String tt = (String) m.get("token_type");
         String at = (String) m.get("access_token");
@@ -1095,7 +1229,7 @@ public class OutlookAuth {
 
         OutlookAuth oa = new OutlookAuth("86b0f61c-2e69-41df-bdbe-49ebce3f7795");
 
-        at = "eyJ0eXAiOiJKV1QiLCJub25jZSI6IkFRQUJBQUFBQUFEWDhHQ2k2SnM2U0s4MlRzRDJQYjdyTWRwOVFVcnB6cC1GdmcyWXNyVVA2cnBvYnBJYVYzemxXMVQ2VTN2dFpmQjJXR1VDazU5aGM4XzFsSGVyUW42QmY0Q3FDUFJ3S2JPMWV3OWFTQkhXSFNBQSIsImFsZyI6IlJTMjU2IiwieDV0IjoiaUJqTDFSY3F6aGl5NGZweEl4ZFpxb2hNMllrIiwia2lkIjoiaUJqTDFSY3F6aGl5NGZweEl4ZFpxb2hNMllrIn0.eyJhdWQiOiJodHRwczovL2dyYXBoLm1pY3Jvc29mdC5jb20iLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLm5ldC82ZmNlNGJiOC0zNTAxLTQxYzktYWZjYy1kYjBmYjUxYzdlM2QvIiwiaWF0IjoxNTI1NjkwNjA4LCJuYmYiOjE1MjU2OTA2MDgsImV4cCI6MTUyNTY5NDUwOCwiYWNyIjoiMSIsImFpbyI6IlkyZGdZSENWV0x3M3hleDd0STFpQWVmQkR5bkdlVjlQUDV5aTlUaFFYTURFZXRmemU4NEEiLCJhbXIiOlsicHdkIl0sImFwcF9kaXNwbGF5bmFtZSI6InRlc3Qgb3V0bG9vayByZXN0IiwiYXBwaWQiOiI4NmIwZjYxYy0yZTY5LTQxZGYtYmRiZS00OWViY2UzZjc3OTUiLCJhcHBpZGFjciI6IjEiLCJmYW1pbHlfbmFtZSI6IlNpZG9yb3YiLCJnaXZlbl9uYW1lIjoiU2VyZ2V5IiwiaXBhZGRyIjoiOTEuMjE3LjI0OC4xMSIsIm5hbWUiOiJTaWRvcm92IFNlcmdleSIsIm9pZCI6ImIxMTMxMzk1LWY5NTAtNDFiYi1iZDVmLTk2OWFiMmFkMzZmNyIsIm9ucHJlbV9zaWQiOiJTLTEtNS0yMS0yNDMwNjcxNDYyLTI4NTI5NzE1NTEtMjc5NjAxMTA1NS0yMTQ1MiIsInBsYXRmIjoiMyIsInB1aWQiOiIxMDAzMDAwMDg5MzFCNTMxIiwic2NwIjoiQ2FsZW5kYXJzLlJlYWQgQ2FsZW5kYXJzLlJlYWRXcml0ZSBDb250YWN0cy5SZWFkIENvbnRhY3RzLlJlYWRXcml0ZSBEZXZpY2UuUmVhZCBGaWxlcy5SZWFkIEZpbGVzLlJlYWRXcml0ZS5BbGwgTWFpbC5SZWFkIE1haWwuUmVhZFdyaXRlIE1haWxib3hTZXR0aW5ncy5SZWFkV3JpdGUgTm90ZXMuUmVhZFdyaXRlLkFsbCBQZW9wbGUuUmVhZCBTaXRlcy5SZWFkV3JpdGUuQWxsIFRhc2tzLlJlYWQgVGFza3MuUmVhZFdyaXRlIFVzZXIuUmVhZCBVc2VyLlJlYWRCYXNpYy5BbGwgVXNlci5SZWFkV3JpdGUgQ2FsZW5kYXJzLlJlYWQuU2hhcmVkIiwic2lnbmluX3N0YXRlIjpbImlua25vd25udHdrIiwia21zaSJdLCJzdWIiOiJiZ05sSVI5ZWhiemoxaU9TTkVmRVdGMklmcWh5aDNDbjZReGNnei1qWno4IiwidGlkIjoiNmZjZTRiYjgtMzUwMS00MWM5LWFmY2MtZGIwZmI1MWM3ZTNkIiwidW5pcXVlX25hbWUiOiJzZXJnZXkuc2lkb3JvdkBkaWdpYS5jb20iLCJ1cG4iOiJzZXJnZXkuc2lkb3JvdkBkaWdpYS5jb20iLCJ1dGkiOiJ0X2N5V2lobHQweUNBQV9zYXRrY0FBIiwidmVyIjoiMS4wIn0.PmCHK-dHp6ezpLsnzm3c6vEIlyGe7u5JiwIWalmAlNlNbGoKq05yYB-TxjsjzAlybJ94L7FThSYnRDtzbMY621OraiJ_Q9OIGSWh1FsKyRWprow-I1TbzFrn-ib8o56P1TJtycJEBrDRrk43Urq-mFMCfJhDkSWGYLCGBcEIPyyiOVTtTdiuYXabbxV9XXgZ19Q9Dgq7w0KPlqGDx1NOr66A1Oke2Rfa7vRMADVQVuO5qLcQ4x0VKZt7zXO2crz-NjzVQFY13gHpTX5ZMOW1DioGiTZei1aMSe4LcqTI8Zyxp-QRev-BAa438hKN33r0gDXqSx1c5qGeqrmhiEURwA";
+        at = "eyJ0eXAiOiJKV1QiLCJub25jZSI6IkFRQUJBQUFBQUFEWDhHQ2k2SnM2U0s4MlRzRDJQYjdyTUZYWkxfZmNGa1phUEFrZnpzSFU3V01DcS15d05yYW5tQnFhNnVpMFlpV19fWnRtZXZCTmdaa24zUnQzYzR1RGdIelBSNmowQmNCVUtCcTFVRk9BNkNBQSIsImFsZyI6IlJTMjU2IiwieDV0IjoiaUJqTDFSY3F6aGl5NGZweEl4ZFpxb2hNMllrIiwia2lkIjoiaUJqTDFSY3F6aGl5NGZweEl4ZFpxb2hNMllrIn0.eyJhdWQiOiJodHRwczovL2dyYXBoLm1pY3Jvc29mdC5jb20iLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLm5ldC82ZmNlNGJiOC0zNTAxLTQxYzktYWZjYy1kYjBmYjUxYzdlM2QvIiwiaWF0IjoxNTI1NzU3OTgyLCJuYmYiOjE1MjU3NTc5ODIsImV4cCI6MTUyNTc2MTg4MiwiYWNyIjoiMSIsImFpbyI6IkFTUUEyLzhIQUFBQTZNV0swcXozU1NuQmZyNk0yYmZDQUFoYzFVS2xlZWdmejNLYmN4VVhqVnM9IiwiYW1yIjpbInB3ZCJdLCJhcHBfZGlzcGxheW5hbWUiOiJ0ZXN0IG91dGxvb2sgcmVzdCIsImFwcGlkIjoiODZiMGY2MWMtMmU2OS00MWRmLWJkYmUtNDllYmNlM2Y3Nzk1IiwiYXBwaWRhY3IiOiIxIiwiZmFtaWx5X25hbWUiOiJTaWRvcm92IiwiZ2l2ZW5fbmFtZSI6IlNlcmdleSIsImlwYWRkciI6IjkxLjIxNy4yNDguMTEiLCJuYW1lIjoiU2lkb3JvdiBTZXJnZXkiLCJvaWQiOiJiMTEzMTM5NS1mOTUwLTQxYmItYmQ1Zi05NjlhYjJhZDM2ZjciLCJvbnByZW1fc2lkIjoiUy0xLTUtMjEtMjQzMDY3MTQ2Mi0yODUyOTcxNTUxLTI3OTYwMTEwNTUtMjE0NTIiLCJwbGF0ZiI6IjMiLCJwdWlkIjoiMTAwMzAwMDA4OTMxQjUzMSIsInNjcCI6IkNhbGVuZGFycy5SZWFkIENhbGVuZGFycy5SZWFkLlNoYXJlZCBDYWxlbmRhcnMuUmVhZFdyaXRlIENvbnRhY3RzLlJlYWQgQ29udGFjdHMuUmVhZFdyaXRlIERldmljZS5SZWFkIEZpbGVzLlJlYWQgRmlsZXMuUmVhZFdyaXRlLkFsbCBNYWlsLlJlYWQgTWFpbC5SZWFkV3JpdGUgTWFpbGJveFNldHRpbmdzLlJlYWRXcml0ZSBOb3Rlcy5SZWFkV3JpdGUuQWxsIFBlb3BsZS5SZWFkIFNpdGVzLlJlYWRXcml0ZS5BbGwgVGFza3MuUmVhZCBUYXNrcy5SZWFkV3JpdGUgVXNlci5SZWFkIFVzZXIuUmVhZEJhc2ljLkFsbCBVc2VyLlJlYWRXcml0ZSIsInNpZ25pbl9zdGF0ZSI6WyJpbmtub3dubnR3ayIsImttc2kiXSwic3ViIjoiYmdObElSOWVoYnpqMWlPU05FZkVXRjJJZnFoeWgzQ242UXhjZ3otalp6OCIsInRpZCI6IjZmY2U0YmI4LTM1MDEtNDFjOS1hZmNjLWRiMGZiNTFjN2UzZCIsInVuaXF1ZV9uYW1lIjoic2VyZ2V5LnNpZG9yb3ZAZGlnaWEuY29tIiwidXBuIjoic2VyZ2V5LnNpZG9yb3ZAZGlnaWEuY29tIiwidXRpIjoiLWhOQW9hMXZtVXlyRExjYm9yWXZBQSIsInZlciI6IjEuMCJ9.VHizjBamgSb0BjPgY4qlAmtjfGErMGbxShCjiYaSB7L-SzfdqaSp73hSbaBijRTRCYIqSZ6g2yN8FSYDlQSSB5S_tJ8enEz_nEJ7kRkMeIp4Is3-0KfawChZAAUZHWKPaQ0hAevpYDPgTXTzEsiazp7g17BHO9or45KerdROe0HXAm7x6tZ-uaGPLH5zLKTztFM6PGmB1CDYXWBLCXYYxu7sIGRHmqYfG_FKrFQrtgezuM6bdWjdZU1Lw3UiwNqu0rtVQazVmYX7d_POoDxRa44vvDseWnV8BTtKjSd_mdyxs_zGoW5qKtvlYAqH9S3NhQ75yiPyBOUwhLzYgEeMQQ";
         it = at;
 
         for (String[] token2 : new String[][]{{"access", at}}) {
@@ -1114,7 +1248,21 @@ public class OutlookAuth {
                         7);
                 System.out.println("Time slots(today, " + tss.size() + "):\n" + tss);
                 System.out.println("Time slots(week+, " + tss2.size() + "):\n" + tss2);
+
+                System.out.println("JSON: " + xJSON.write(rl));
+                System.out.println((rl.fetching) ? "\nfetching timeslots " : "");
+                while (rl.fetching) {
+                    System.out.print(".");
+                    System.out.flush();
+                    Thread.sleep(1000);
+                }
+                System.out.println();
+                long[] range = rl.timeSlotsRange();
+                range[0] = roundTimeHour(null, range[0], true);
+                range[1] = roundTimeHour(null, range[1], false);
+                System.out.println("ASCII: " + rl.toASCII(null, range[0], range[1], 1000 * 60 * 15 * 2 / 6));
             } catch (Throwable th) {
+                th.printStackTrace();
             }
         }
     }

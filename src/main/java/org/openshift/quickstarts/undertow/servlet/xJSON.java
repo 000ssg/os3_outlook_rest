@@ -5,15 +5,28 @@
  */
 package org.openshift.quickstarts.undertow.servlet;
 
+import com.sun.org.apache.xml.internal.security.utils.Base64;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.PushbackReader;
 import java.io.StringReader;
+import java.io.StringWriter;
+import java.io.Writer;
+import java.lang.reflect.Array;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 /**
  *
@@ -248,5 +261,226 @@ public class xJSON {
 
     public static <T> T read(InputStream is, String encoding) throws IOException {
         return read(new PushbackReader(new InputStreamReader(is, encoding)));
+    }
+
+    public static String write(Object obj) throws IOException {
+        StringWriter wr = new StringWriter();
+        write(obj, wr);
+        return wr.toString();
+    }
+
+    public static void write(Object obj, OutputStream os) throws IOException {
+        Writer wr = new OutputStreamWriter(os, "UTF-8");
+        write(obj, wr);
+        wr.close();
+    }
+
+    public static void write(Object obj, Writer writer) throws IOException {
+        if (obj == null) {
+            writer.write("null");
+        } else if (obj instanceof Boolean) {
+            writer.write("" + obj);
+        } else if (obj instanceof Number) {
+            writer.write("" + obj);
+        } else if (obj instanceof String) {
+            writer.write('"' + ((String) obj)
+                    .replace("\\", "\\\\")
+                    .replace("/", "\\/")
+                    .replace("\"", "\\\"")
+                    .replace("\n", "\\n")
+                    .replace("\r", "\\r")
+                    .replace("\t", "\\t")
+                    .replace("\f", "\\f")
+                    .replace("\b", "\\b")
+                    + '"');
+        } else if (obj instanceof byte[]) {
+            writer.write('"' + Base64.encode((byte[]) obj) + '"');
+        } else if (obj instanceof Collection) {
+            writer.write('[');
+            boolean first = true;
+            for (Object item : (Collection) obj) {
+                if (first) {
+                    first = false;
+                } else {
+                    writer.write(",");
+                }
+                write(item, writer);
+            }
+            writer.write(']');
+        } else if (obj.getClass().isArray()) {
+            writer.write('[');
+            for (int i = 0; i < Array.getLength(obj); i++) {
+                if (i > 0) {
+                    writer.write(',');
+                }
+                write(Array.get(obj, i), writer);
+            }
+            writer.write(']');
+        } else if (obj instanceof Map) {
+            writer.write('{');
+            boolean first = true;
+            for (Entry<Object, Object> e : ((Map<Object, Object>) obj).entrySet()) {
+                if (first) {
+                    first = false;
+                } else {
+                    writer.write(',');
+                }
+                write(e.getKey(), writer);
+                writer.write(':');
+                write(e.getValue(), writer);
+            }
+            writer.write('}');
+        } else {
+            Refl ref = refl.get();
+            if (ref != null) {
+                writer.write('{');
+                boolean first = true;
+                Collection<String> ns = ref.names(obj);
+                if (ns != null) {
+                    for (String n : ns) {
+                        if (first) {
+                            first = false;
+                        } else {
+                            writer.write(',');
+                        }
+                        write(n, writer);
+                        writer.write(':');
+                        write(ref.value(obj, n), writer);
+                    }
+                }
+                writer.write('}');
+            } else {
+                throw new IOException("Non-primitive value: '" + obj.getClass().getName() + "' need adapter.");
+            }
+        }
+    }
+
+    static ThreadLocal<Refl> refl = new ThreadLocal<Refl>() {
+        @Override
+        protected Refl initialValue() {
+            return new ReflImpl();
+        }
+    };
+
+    public static interface Refl {
+
+        void clear();
+
+        Collection<String> names(Object obj);
+
+        <T> T value(Object obj, String name);
+    }
+
+    public static class ReflImpl implements Refl {
+
+        Map<Class, Map<String, Object[]>> cache = new LinkedHashMap<Class, Map<String, Object[]>>();
+
+        @Override
+        public void clear() {
+            cache.clear();
+        }
+
+        @Override
+        public Collection<String> names(Object obj) {
+            if (obj == null) {
+                return Collections.emptyList();
+            }
+            Class cl = obj.getClass();
+            Map<String, Object[]> ns = cache.get(cl);
+            if (ns == null) {
+                init(cl);
+                ns = cache.get(cl);
+            }
+            return ns.keySet();
+        }
+
+        @Override
+        public <T> T value(Object obj, String name) {
+            if (obj == null) {
+                return null;
+            }
+            Class cl = obj.getClass();
+            Map<String, Object[]> ns = cache.get(cl);
+            if (ns == null) {
+                init(cl);
+                ns = cache.get(cl);
+            }
+            Object[] acc = ns.get(name);
+            if (acc[0] instanceof Field) {
+                try {
+                    return (T) ((Field) acc[0]).get(obj);
+                } catch (Throwable th) {
+                }
+            } else if (acc[0] instanceof Method) {
+                try {
+                    return (T) ((Method) acc[0]).invoke(obj);
+                } catch (Throwable th) {
+                }
+            }
+            return null;
+        }
+
+        void init(Class cl) {
+            if (cl == null) {
+                return;
+            }
+            Map<String, Object[]> accs = new HashMap<String, Object[]>();
+            cache.put(cl, accs);
+            try {
+                for (Field f : cl.getFields()) {
+                    if (Modifier.isStatic(f.getModifiers()) || !Modifier.isPublic(f.getModifiers()) || Modifier.isTransient(f.getModifiers())) {
+                        continue;
+                    }
+                    accs.put(f.getName(), new Object[]{f, f});
+                }
+                // gets..
+                for (Method f : cl.getMethods()) {
+                    if (Modifier.isStatic(f.getModifiers()) || !Modifier.isPublic(f.getModifiers())) {
+                        continue;
+                    }
+                    if (f.getParameterCount() > 0) {
+                        continue;
+                    }
+                    String n = f.getName();
+                    if (n.startsWith("is") || n.startsWith("get")) {
+                        if (f.getName().equals("getClass")) {
+                            continue;
+                        }
+                        if (n.startsWith("is")) {
+                            n = n.substring(2);
+                        } else {
+                            n = n.substring(3);
+                        }
+                        n = n.substring(0, 1).toLowerCase() + n.substring(1);
+                        if (!accs.containsKey(n)) {
+                            accs.put(n, new Object[]{f, null});
+                        }
+                    }
+                }
+                // sets..
+                for (Method f : cl.getMethods()) {
+                    if (Modifier.isStatic(f.getModifiers()) || !Modifier.isPublic(f.getModifiers())) {
+                        continue;
+                    }
+                    if (f.getParameterCount() != 1 || f.getReturnType() == null) {
+                        continue;
+                    }
+                    String n = f.getName();
+                    if (n.startsWith("set")) {
+                        n = n.substring(3);
+                        n = n.substring(0, 1).toLowerCase() + n.substring(1);
+                        Object[] acc = accs.get(n);
+                        if (acc == null) {
+                            accs.put(n, new Object[]{null, f});
+                        } else {
+                            if (acc[1] == null) {
+                                acc[1] = f;
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable th) {
+            }
+        }
     }
 }

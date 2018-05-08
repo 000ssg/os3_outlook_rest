@@ -78,6 +78,14 @@ public class OutlookServlet extends HttpServlet {
                     rl = oa.fetchRooms((String) req.getSession().getAttribute("token"), TIME_PERIOD.today);
                     req.getSession().setAttribute("roomLists", rl);
                     extra = "Rooms lists:\n  " + ("" + rl).replace("\n", "\n  ");
+
+                    try {
+                        long[] range = rl.timeSlotsRange();
+                        range[0] = OutlookAuth.roundTimeHour(null, range[0], true);
+                        range[1] = OutlookAuth.roundTimeHour(null, range[1], false);
+                        extra += "\n" + ("ASCII: " + rl.toASCII(null, range[0], range[1], 1000 * 60 * 15 * 2 / 6));
+                    } catch (Throwable th) {
+                    }
                 } catch (Throwable th) {
                     extra = "Rooms lists: ERROR:\n  " + th;
                 }
@@ -89,7 +97,7 @@ public class OutlookServlet extends HttpServlet {
                 Map map = xJSON.read(rrl);
                 extra = "Messages:\n  " + Dump.dump(map, true, true).replace("\n", "\n  ");
             } catch (Throwable th) {
-                extra = "Rooms lists:\n" + rrl + "\n---  ERROR:\n  " + th;
+                extra = "Messages:\n" + rrl + "\n---  ERROR:\n  " + th;
             }
         }
 
