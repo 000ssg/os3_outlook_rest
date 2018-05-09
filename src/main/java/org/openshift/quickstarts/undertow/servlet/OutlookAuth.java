@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TimeZone;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.GZIPInputStream;
 import org.openshift.quickstarts.undertow.servlet.OutlookAuth.RoomLists.Room;
 import org.openshift.quickstarts.undertow.servlet.OutlookAuth.RoomLists.TimeSlot;
@@ -548,6 +549,85 @@ public class OutlookAuth {
         return r;
     }
 
+    public RoomLists fetchRooms(final String token, final Integer days) throws IOException {
+        final RoomLists r = roomsLists(token);
+        r.roomListsNS = System.nanoTime();
+        r.roomListsC = r.lists.size();
+        for (Entry<String, String> re : r.lists.entrySet()) {
+            List<Room> rooms = roomsList(token, re.getValue());
+            r.rooms.put(re.getKey(), rooms);
+            if (rooms != null) {
+                r.roomsListC += rooms.size();
+            }
+        }
+        r.roomsListNS = System.nanoTime();
+
+        if (days != null) {
+            r.fetching = true;
+
+            if (1 == 0) {
+
+                Runnable run = new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            for (Entry<String, List<Room>> re : r.rooms.entrySet()) {
+                                if (re.getValue() != null) {
+                                    for (Room room : re.getValue()) {
+                                        List<TimeSlot> trs = eventsListDays(token, room, days);
+                                        if (trs != null) {
+                                            room.allocations.addAll(trs);
+                                            r.timeSlotsC += trs.size();
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (IOException ioex) {
+                        } finally {
+                            r.timeSlotsNS = System.nanoTime();
+                            r.fetching = false;
+                        }
+                    }
+                };
+                Thread th = new Thread(run);
+                th.setDaemon(true);
+                th.start();
+            } else {
+                final AtomicInteger ai = new AtomicInteger();
+
+                List<Thread> ths = new ArrayList<Thread>();
+                for (Room room : r.allRooms()) {
+                    Thread th = new Thread() {
+                        @Override
+                        public void run() {
+                            try {
+                                List<TimeSlot> trs = eventsListDays(token, room, days);
+                                if (trs != null) {
+                                    room.allocations.addAll(trs);
+                                    r.timeSlotsC += trs.size();
+                                }
+                            } catch (Throwable th) {
+                            } finally {
+                                int c = ai.decrementAndGet();
+                                if (c == 0) {
+                                    r.fetching = false;
+                                }
+                            }
+                        }
+                    };
+                    ths.add(th);
+                    ai.incrementAndGet();
+                }
+
+                for (Thread th : ths) {
+                    th.setDaemon(true);
+                    th.start();
+                }
+            }
+        }
+        return r;
+    }
+
     public List<Room> roomsList(String token, String roomList) throws IOException {
         List<Room> roomsList = new ArrayList<Room>();
         URL url = new URL(roomsListUrl + ((roomList != null) ? "(roomlist='" + roomList + "')" : ""));
@@ -1027,58 +1107,20 @@ public class OutlookAuth {
 
         public transient boolean fetching = false;
 
-        public static class Room implements Serializable {
-
-            public String name;
-            public String address;
-            public List<TimeSlot> allocations = new ArrayList<TimeSlot>();
-
-            public Room() {
-            }
-
-            public Room(String name, String address) {
-                this.name = name;
-                this.address = address;
-            }
-
-            @Override
-            public String toString() {
-                StringBuilder sb = new StringBuilder();
-                sb.append("Room{" + "name=" + name + ", address=" + address + ", allocations=" + allocations.size());
-                for (TimeSlot ts : allocations) {
-                    sb.append("\n  " + ts);
-                }
-                sb.append('}');
-                return sb.toString();
-            }
-
-        }
-
         static DateFormat tsDTF = new SimpleDateFormat("yyyy-MM-dd HH:mm z");
 
         static {
             tsDTF.setTimeZone(TimeZone.getTimeZone("UTC"));
         }
 
-        public static class TimeSlot implements Serializable {
-
-            public long from;
-            public long to;
-            public long created;
-            public long modified;
-            public int attendees;
-            public int mandatoryAttendees;
-
-            public TimeSlot(long from, long to) {
-                this.from = from;
-                this.to = to;
+        public List<Room> allRooms() {
+            List<Room> r = new ArrayList<Room>();
+            for (List<Room> rs : rooms.values()) {
+                if (rs != null && !rs.isEmpty()) {
+                    r.addAll(rs);
+                }
             }
-
-            @Override
-            public String toString() {
-                return "TimeSlot{" + "from=" + from + " (" + tsDTF.format(new Date(from)) + ")" + ", to=" + to + ", length=" + ((to - from) / 1000 / 60 / 60f) + "h" + ", attendees=" + attendees + ", mandatoryAttendees=" + mandatoryAttendees + '}';
-            }
-
+            return r;
         }
 
         @Override
@@ -1215,6 +1257,55 @@ public class OutlookAuth {
 
             return sb.toString();
         }
+
+        public static class Room implements Serializable {
+
+            public String name;
+            public String address;
+            public List<TimeSlot> allocations = new ArrayList<TimeSlot>();
+
+            public Room() {
+            }
+
+            public Room(String name, String address) {
+                this.name = name;
+                this.address = address;
+            }
+
+            @Override
+            public String toString() {
+                StringBuilder sb = new StringBuilder();
+                sb.append("Room{" + "name=" + name + ", address=" + address + ", allocations=" + allocations.size());
+                for (TimeSlot ts : allocations) {
+                    sb.append("\n  " + ts);
+                }
+                sb.append('}');
+                return sb.toString();
+            }
+
+        }
+
+        public static class TimeSlot implements Serializable {
+
+            public long from;
+            public long to;
+            public long created;
+            public long modified;
+            public int attendees;
+            public int mandatoryAttendees;
+
+            public TimeSlot(long from, long to) {
+                this.from = from;
+                this.to = to;
+            }
+
+            @Override
+            public String toString() {
+                return "TimeSlot{" + "from=" + from + " (" + tsDTF.format(new Date(from)) + ")" + ", to=" + to + ", length=" + ((to - from) / 1000 / 60 / 60f) + "h" + ", attendees=" + attendees + ", mandatoryAttendees=" + mandatoryAttendees + '}';
+            }
+
+        }
+
     }
 
     public static void main(String[] args) throws Exception {
@@ -1229,14 +1320,15 @@ public class OutlookAuth {
 
         OutlookAuth oa = new OutlookAuth("86b0f61c-2e69-41df-bdbe-49ebce3f7795");
 
-        at = "eyJ0eXAiOiJKV1QiLCJub25jZSI6IkFRQUJBQUFBQUFEWDhHQ2k2SnM2U0s4MlRzRDJQYjdyek12UFN6YkRjRkZ3QmtBUFlwRjUyZkdSX0dkZXI4SlREZE1MZ3RYWVNmUnV1NzhwS2wtbWRmNzF4OFprajBwU3dUdC1Na3pEbmlOQml1VEFUUEoydWlBQSIsImFsZyI6IlJTMjU2IiwieDV0IjoiaUJqTDFSY3F6aGl5NGZweEl4ZFpxb2hNMllrIiwia2lkIjoiaUJqTDFSY3F6aGl5NGZweEl4ZFpxb2hNMllrIn0.eyJhdWQiOiJodHRwczovL2dyYXBoLm1pY3Jvc29mdC5jb20iLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLm5ldC82ZmNlNGJiOC0zNTAxLTQxYzktYWZjYy1kYjBmYjUxYzdlM2QvIiwiaWF0IjoxNTI1NzU4NTY0LCJuYmYiOjE1MjU3NTg1NjQsImV4cCI6MTUyNTc2MjQ2NCwiYWNyIjoiMSIsImFpbyI6IlkyZGdZSENWV0x3M3hleDd0STFpQWVmQkR5bkdlVjlQUDV5aTlUaFFYTURFZXRmemU4NEEiLCJhbXIiOlsicHdkIl0sImFwcF9kaXNwbGF5bmFtZSI6InRlc3Qgb3V0bG9vayByZXN0IiwiYXBwaWQiOiI4NmIwZjYxYy0yZTY5LTQxZGYtYmRiZS00OWViY2UzZjc3OTUiLCJhcHBpZGFjciI6IjEiLCJmYW1pbHlfbmFtZSI6IlNpZG9yb3YiLCJnaXZlbl9uYW1lIjoiU2VyZ2V5IiwiaXBhZGRyIjoiOTEuMjE3LjI0OC4xMSIsIm5hbWUiOiJTaWRvcm92IFNlcmdleSIsIm9pZCI6ImIxMTMxMzk1LWY5NTAtNDFiYi1iZDVmLTk2OWFiMmFkMzZmNyIsIm9ucHJlbV9zaWQiOiJTLTEtNS0yMS0yNDMwNjcxNDYyLTI4NTI5NzE1NTEtMjc5NjAxMTA1NS0yMTQ1MiIsInBsYXRmIjoiMyIsInB1aWQiOiIxMDAzMDAwMDg5MzFCNTMxIiwic2NwIjoiQ2FsZW5kYXJzLlJlYWQgQ2FsZW5kYXJzLlJlYWQuU2hhcmVkIENhbGVuZGFycy5SZWFkV3JpdGUgQ29udGFjdHMuUmVhZCBDb250YWN0cy5SZWFkV3JpdGUgRGV2aWNlLlJlYWQgRmlsZXMuUmVhZCBGaWxlcy5SZWFkV3JpdGUuQWxsIE1haWwuUmVhZCBNYWlsLlJlYWRXcml0ZSBNYWlsYm94U2V0dGluZ3MuUmVhZFdyaXRlIE5vdGVzLlJlYWRXcml0ZS5BbGwgUGVvcGxlLlJlYWQgU2l0ZXMuUmVhZFdyaXRlLkFsbCBUYXNrcy5SZWFkIFRhc2tzLlJlYWRXcml0ZSBVc2VyLlJlYWQgVXNlci5SZWFkQmFzaWMuQWxsIFVzZXIuUmVhZFdyaXRlIiwic2lnbmluX3N0YXRlIjpbImlua25vd25udHdrIiwia21zaSJdLCJzdWIiOiJiZ05sSVI5ZWhiemoxaU9TTkVmRVdGMklmcWh5aDNDbjZReGNnei1qWno4IiwidGlkIjoiNmZjZTRiYjgtMzUwMS00MWM5LWFmY2MtZGIwZmI1MWM3ZTNkIiwidW5pcXVlX25hbWUiOiJzZXJnZXkuc2lkb3JvdkBkaWdpYS5jb20iLCJ1cG4iOiJzZXJnZXkuc2lkb3JvdkBkaWdpYS5jb20iLCJ1dGkiOiJQdF9wRkF1SFIwLTdZZmFWSThJbUFBIiwidmVyIjoiMS4wIn0.gZJ1Ppy8-g8ofAqjJLVfXjF091K7Wlle6UUPtoiefaF2wmLtvrSgE68YMHhKqwZCUVT3OVb51myxV6eSjYHnq9ceWB7YaREDev5uak4KSZoFKDLGWgJJtt4XnXUqXKaoi32sjOZerYZPAioeXB4u1gUBag7nh9MPjQsi2Vtv4tqIQHmvv7gQhh5hW0-eZ_PnhRcG8BSSbEBpciIavbZhqNutc1d9Qzj_rpuaO8eNL9PImRbMQjWFLmYvRxyMBK_Sl_1FVOGa8bmfPJDmVoNE-etTGM1B3hGdQ96SA4p7oN5S9EhYbvVLaLSbEWfKplW--NkvZpVcxiPI6NEBABYmJg";
+        at = "eyJ0eXAiOiJKV1QiLCJub25jZSI6IkFRQUJBQUFBQUFEWDhHQ2k2SnM2U0s4MlRzRDJQYjdyTXpYSTFXVDhJVVFHQ2J1VHdXUFg5YzcxYWR2bDRjdlVsdWNWWlFrdFZKSG1RSlJIczRLT1Z4OC1pRWhKSlR2aURmU3RLRDZVemFiaHVkR1lyTEVqT0NBQSIsImFsZyI6IlJTMjU2IiwieDV0IjoiaUJqTDFSY3F6aGl5NGZweEl4ZFpxb2hNMllrIiwia2lkIjoiaUJqTDFSY3F6aGl5NGZweEl4ZFpxb2hNMllrIn0.eyJhdWQiOiJodHRwczovL2dyYXBoLm1pY3Jvc29mdC5jb20iLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLm5ldC82ZmNlNGJiOC0zNTAxLTQxYzktYWZjYy1kYjBmYjUxYzdlM2QvIiwiaWF0IjoxNTI1NzYyMzY4LCJuYmYiOjE1MjU3NjIzNjgsImV4cCI6MTUyNTc2NjI2OCwiYWNyIjoiMSIsImFpbyI6IlkyZGdZR2pwOG5saHY4UWlkb3JvN0ozVFJCV204MCt3WHk1VmNyVjBycTcyeDlhbHh0MEEiLCJhbXIiOlsicHdkIl0sImFwcF9kaXNwbGF5bmFtZSI6InRlc3Qgb3V0bG9vayByZXN0IiwiYXBwaWQiOiI4NmIwZjYxYy0yZTY5LTQxZGYtYmRiZS00OWViY2UzZjc3OTUiLCJhcHBpZGFjciI6IjEiLCJmYW1pbHlfbmFtZSI6IlNpZG9yb3YiLCJnaXZlbl9uYW1lIjoiU2VyZ2V5IiwiaXBhZGRyIjoiOTEuMjE3LjI0OC4xMSIsIm5hbWUiOiJTaWRvcm92IFNlcmdleSIsIm9pZCI6ImIxMTMxMzk1LWY5NTAtNDFiYi1iZDVmLTk2OWFiMmFkMzZmNyIsIm9ucHJlbV9zaWQiOiJTLTEtNS0yMS0yNDMwNjcxNDYyLTI4NTI5NzE1NTEtMjc5NjAxMTA1NS0yMTQ1MiIsInBsYXRmIjoiMyIsInB1aWQiOiIxMDAzMDAwMDg5MzFCNTMxIiwic2NwIjoiQ2FsZW5kYXJzLlJlYWQgQ2FsZW5kYXJzLlJlYWQuU2hhcmVkIENhbGVuZGFycy5SZWFkV3JpdGUgQ29udGFjdHMuUmVhZCBDb250YWN0cy5SZWFkV3JpdGUgRGV2aWNlLlJlYWQgRmlsZXMuUmVhZCBGaWxlcy5SZWFkV3JpdGUuQWxsIE1haWwuUmVhZCBNYWlsLlJlYWRXcml0ZSBNYWlsYm94U2V0dGluZ3MuUmVhZFdyaXRlIE5vdGVzLlJlYWRXcml0ZS5BbGwgUGVvcGxlLlJlYWQgU2l0ZXMuUmVhZFdyaXRlLkFsbCBUYXNrcy5SZWFkIFRhc2tzLlJlYWRXcml0ZSBVc2VyLlJlYWQgVXNlci5SZWFkQmFzaWMuQWxsIFVzZXIuUmVhZFdyaXRlIiwic2lnbmluX3N0YXRlIjpbImlua25vd25udHdrIiwia21zaSJdLCJzdWIiOiJiZ05sSVI5ZWhiemoxaU9TTkVmRVdGMklmcWh5aDNDbjZReGNnei1qWno4IiwidGlkIjoiNmZjZTRiYjgtMzUwMS00MWM5LWFmY2MtZGIwZmI1MWM3ZTNkIiwidW5pcXVlX25hbWUiOiJzZXJnZXkuc2lkb3JvdkBkaWdpYS5jb20iLCJ1cG4iOiJzZXJnZXkuc2lkb3JvdkBkaWdpYS5jb20iLCJ1dGkiOiJ5NGJUczlYZHRrdVkwNzhJMThVdkFBIiwidmVyIjoiMS4wIn0.NEsAgkpQLyRMKm41UFPQJe7QjGzaXV_gf82zRu62RuX-kz-YnSKlfyoueP78ed_rNGoxIaAatM7HTf0Xoc4pH52BEHRFM7_06h3i3UUOB3d_zAm4J4qOMWIohDGHFNmtaOHYolvEn01amaaQKkJZmsoHgI1TYPY9sQmVvppuvgm3Smw3vgppJRiuoDnYyB5_BAxEn5iZTu7jCT7PjdNdpI5CAU255IZ5Kb4NS4eArEbOb_VrJznGvikBu7QJXdi_tJi-_kriOuATASTBdRCZ1r5b_mxztWJozy-FBe-mx5UXc4IB635RalqvpQKCUIX33zMlcfa8VosSG8qOADZfUQ";
         it = at;
 
         for (String[] token2 : new String[][]{{"access", at}}) {
             System.out.println("TOKEN: " + token2[0] + " -> " + token2[1]);
             try {
                 //RoomLists rl = oa.roomsLists(token2[1]);
-                RoomLists rl = oa.fetchRooms(token2[1], TIME_PERIOD.today);
+                //RoomLists rl = oa.fetchRooms(token2[1], TIME_PERIOD.today);
+                RoomLists rl = oa.fetchRooms(token2[1], 1);
                 System.out.println("Response:\n" + rl);
                 List<TimeSlot> tss = oa.eventsListDays(
                         token2[1],
