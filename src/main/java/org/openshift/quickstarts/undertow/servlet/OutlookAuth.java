@@ -610,6 +610,7 @@ public class OutlookAuth {
                             } finally {
                                 int c = ai.decrementAndGet();
                                 if (c <= 0) {
+                                    r.timeSlotsNS = System.nanoTime();
                                     r.fetching = false;
                                 }
                             }
