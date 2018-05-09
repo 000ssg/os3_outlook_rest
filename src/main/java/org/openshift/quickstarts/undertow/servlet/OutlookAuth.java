@@ -7,8 +7,13 @@ import java.io.PrintWriter;
 import java.io.Serializable;
 import java.io.StringWriter;
 import java.net.HttpURLConnection;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.nio.ByteBuffer;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -37,6 +42,7 @@ public class OutlookAuth {
     }
 
     String authUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
+    String adminUrl = "https://login.microsoftonline.com/common/adminconsent";
     String tokenUrl = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
 
     String apiBase = "https://graph.microsoft.com/";
@@ -211,21 +217,21 @@ public class OutlookAuth {
         {
             for (String s : new String[]{
                 "Calendars.Read.Shared", // D
-                "Calendars.ReadWrite", // D
-                "Contacts.ReadWrite", // D
-                "Files.ReadWrite.All", // D
-                "Mail.ReadWrite", // D
-                "MailboxSettings.ReadWrite", // D
-                "User.ReadWrite", // D
-                "User.ReadBasic.All", // D
-                "Notes.ReadWrite.All", // D
-                "Sites.ReadWrite.All", // D
-                "Tasks.ReadWrite", // D
+//                "Calendars.ReadWrite", // D
+//                "Contacts.ReadWrite", // D
+//                "Files.ReadWrite.All", // D
+//                "Mail.ReadWrite", // D
+//                "MailboxSettings.ReadWrite", // D
+//                "User.ReadWrite", // D
+//                "User.ReadBasic.All", // D
+//                "Notes.ReadWrite.All", // D
+//                "Sites.ReadWrite.All", // D
+//                "Tasks.ReadWrite", // D
                 "Directory.AccessAsUser.All", // A,D
                 "Directory.ReadWrite.All", // A,D
                 "Group.ReadWrite.All", // A,D
                 "User.ReadWrite.All", // A, D
-                "People.Read", // D
+//                "People.Read", // D
                 "IdentityRiskEvent.Read.All", // A,D,P
                 "DeviceManagementServiceConfig.Read.All", // A,D,P
                 "DeviceManagementServiceConfig.ReadWrite.All", // A,D,P
@@ -239,7 +245,7 @@ public class OutlookAuth {
                 "DeviceManagementManagedDevices.ReadWrite.All", // A,D,P
                 "DeviceManagementManagedDevices.PriviledgedOperations.All", // A,D,P
                 "Reports.Read.All", // A,D,P
-                "Bookings.Read.All" // P
+//                "Bookings.Read.All" // P
             }) {
                 if (s != null && !s.trim().isEmpty()) {
                     add(s);
@@ -600,6 +606,7 @@ public class OutlookAuth {
                     Thread th = new Thread() {
                         @Override
                         public void run() {
+                            ai.incrementAndGet();
                             try {
                                 List<TimeSlot> trs = eventsListDays(token, room, days);
                                 if (trs != null) {
@@ -617,7 +624,6 @@ public class OutlookAuth {
                         }
                     };
                     ths.add(th);
-                    ai.incrementAndGet();
                 }
 
                 for (Thread th : ths) {
@@ -806,23 +812,28 @@ public class OutlookAuth {
                     String context = (String) m.get("@odata.context");
                     String nextLink = (String) m.get("@odata.nextLink");
                     for (Map<String, Map> rm : ((List<Map<String, Map>>) m.get("value"))) {
-                        DateFormat df = getDTF((String) ((Map) rm.get("start")).get("timeZone"));
-                        Date from = df.parse((String) ((Map) rm.get("start")).get("dateTime"));
-                        Date to = df.parse((String) ((Map) rm.get("end")).get("dateTime"));
-                        List<Map> attendees = ((List<Map>) rm.get("attendees"));
-                        int req = 0;
-                        if (attendees != null) {
-                            for (Map ma : attendees) {
-                                if ("required".equals(ma.get("type"))) {
-                                    req++;
+                        try {
+                            DateFormat df = getDTF((String) ((Map) rm.get("start")).get("timeZone"));
+                            Date from = df.parse((String) ((Map) rm.get("start")).get("dateTime"));
+                            Date to = df.parse((String) ((Map) rm.get("end")).get("dateTime"));
+                            List<Map> attendees = ((List<Map>) rm.get("attendees"));
+                            int req = 0;
+                            if (attendees != null) {
+                                for (Map ma : attendees) {
+                                    if ("required".equals(ma.get("type"))) {
+                                        req++;
+                                    }
                                 }
                             }
-                        }
 
-                        TimeSlot ts = new TimeSlot(from.getTime(), to.getTime());
-                        ts.attendees = (attendees != null) ? attendees.size() : 0;
-                        ts.mandatoryAttendees = req;
-                        timeSlots.add(ts);
+                            TimeSlot ts = new TimeSlot(from.getTime(), to.getTime());
+                            ts.attendees = (attendees != null) ? attendees.size() : 0;
+                            ts.mandatoryAttendees = req;
+                            timeSlots.add(ts);
+                        } catch (Throwable th) {
+                            System.err.println("Skipped timeslot: start=" + ((Map) rm.get("start")) + ", end=" + ((Map) rm.get("end")) + ", attendees=" + ((Map) rm.get("start")) != null);
+                            th.printStackTrace();
+                        }
                     }
                     if (nextLink != null) {
                         List<TimeSlot> nextTSs = eventsList(token, room, start, end, nextLink);
@@ -1321,7 +1332,7 @@ public class OutlookAuth {
 
         OutlookAuth oa = new OutlookAuth("86b0f61c-2e69-41df-bdbe-49ebce3f7795");
 
-        at = "eyJ0eXAiOiJKV1QiLCJub25jZSI6IkFRQUJBQUFBQUFEWDhHQ2k2SnM2U0s4MlRzRDJQYjdyeWJNTU5nbjhSZFV0S1kyWjlJLUQ2ZWVYb1l3YTMtNk5lTHF4Q3pQMHhlV25hSV9iTTcyYmFnQ2Zwb3NXazVFRDlKSlJsUlNRRkRvalVnamFKSV9OMFNBQSIsImFsZyI6IlJTMjU2IiwieDV0IjoiaUJqTDFSY3F6aGl5NGZweEl4ZFpxb2hNMllrIiwia2lkIjoiaUJqTDFSY3F6aGl5NGZweEl4ZFpxb2hNMllrIn0.eyJhdWQiOiJodHRwczovL2dyYXBoLm1pY3Jvc29mdC5jb20iLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLm5ldC82ZmNlNGJiOC0zNTAxLTQxYzktYWZjYy1kYjBmYjUxYzdlM2QvIiwiaWF0IjoxNTI1ODQ1MTQ5LCJuYmYiOjE1MjU4NDUxNDksImV4cCI6MTUyNTg0OTA0OSwiYWNyIjoiMSIsImFpbyI6IlkyZGdZQWc2N1YxVWRIR2EzL3FFMlVjLzNnem5QS3B4elRHUTQydHZTNjNCUGU5Smxoa0EiLCJhbXIiOlsicHdkIl0sImFwcF9kaXNwbGF5bmFtZSI6InRlc3Qgb3V0bG9vayByZXN0IiwiYXBwaWQiOiI4NmIwZjYxYy0yZTY5LTQxZGYtYmRiZS00OWViY2UzZjc3OTUiLCJhcHBpZGFjciI6IjEiLCJmYW1pbHlfbmFtZSI6IlNpZG9yb3YiLCJnaXZlbl9uYW1lIjoiU2VyZ2V5IiwiaXBhZGRyIjoiOTEuMjE3LjI0OC4xMSIsIm5hbWUiOiJTaWRvcm92IFNlcmdleSIsIm9pZCI6ImIxMTMxMzk1LWY5NTAtNDFiYi1iZDVmLTk2OWFiMmFkMzZmNyIsIm9ucHJlbV9zaWQiOiJTLTEtNS0yMS0yNDMwNjcxNDYyLTI4NTI5NzE1NTEtMjc5NjAxMTA1NS0yMTQ1MiIsInBsYXRmIjoiMyIsInB1aWQiOiIxMDAzMDAwMDg5MzFCNTMxIiwic2NwIjoiQ2FsZW5kYXJzLlJlYWQgQ2FsZW5kYXJzLlJlYWQuU2hhcmVkIENhbGVuZGFycy5SZWFkV3JpdGUgQ29udGFjdHMuUmVhZCBDb250YWN0cy5SZWFkV3JpdGUgRGV2aWNlLlJlYWQgRmlsZXMuUmVhZCBGaWxlcy5SZWFkV3JpdGUuQWxsIE1haWwuUmVhZCBNYWlsLlJlYWRXcml0ZSBNYWlsYm94U2V0dGluZ3MuUmVhZFdyaXRlIE5vdGVzLlJlYWRXcml0ZS5BbGwgUGVvcGxlLlJlYWQgU2l0ZXMuUmVhZFdyaXRlLkFsbCBUYXNrcy5SZWFkIFRhc2tzLlJlYWRXcml0ZSBVc2VyLlJlYWQgVXNlci5SZWFkQmFzaWMuQWxsIFVzZXIuUmVhZFdyaXRlIiwic2lnbmluX3N0YXRlIjpbImlua25vd25udHdrIiwia21zaSJdLCJzdWIiOiJiZ05sSVI5ZWhiemoxaU9TTkVmRVdGMklmcWh5aDNDbjZReGNnei1qWno4IiwidGlkIjoiNmZjZTRiYjgtMzUwMS00MWM5LWFmY2MtZGIwZmI1MWM3ZTNkIiwidW5pcXVlX25hbWUiOiJzZXJnZXkuc2lkb3JvdkBkaWdpYS5jb20iLCJ1cG4iOiJzZXJnZXkuc2lkb3JvdkBkaWdpYS5jb20iLCJ1dGkiOiJlOGczeGNYWllFV2pWZ1pfcTRaT0FBIiwidmVyIjoiMS4wIn0.GW-Pn475cMIHF0cAHgUZsI46ClBfWCFdx58iHIAGGsQssmJbl8QO25NbzSE9cyz9GYBW2FjjvjOEx1tzC1K8BJ7igq8f-il3T0Uq1OS8GhH0dh2L5-cC_WjQRi-a1jtV5NbhXzaWUFvAV3WUx09fKgPr7jA6DwtfzjO339f83CAbOynxhdcFT2uf6IeBIHu2Xt8tenIEEDnmhv81DpQiRYIpdvuqAEHjh9Bp2j8K5HWKsrK0cVIbS4BngZ3GZFkMRAjPnltaGFVL6kqzbOy4V_FjoVROF0aimRc9zmN2mD9UT2ldllwym8RJklw3MNyplu4eauBiY4v_PiBIo40SDA";
+        at = "eyJ0eXAiOiJKV1QiLCJub25jZSI6IkFRQUJBQUFBQUFEWDhHQ2k2SnM2U0s4MlRzRDJQYjdyLW9TNV94aURqNHlRVTREaEI4ZTNkMXhLTkQyX01qT1NQVmhBMFhKNE5WMFBEYjFCVkV2RnNsZHBkTm5PY3FZU0JNb2JJejctMG8xSFZ2ZnB3SGNBbmlBQSIsImFsZyI6IlJTMjU2IiwieDV0IjoiaUJqTDFSY3F6aGl5NGZweEl4ZFpxb2hNMllrIiwia2lkIjoiaUJqTDFSY3F6aGl5NGZweEl4ZFpxb2hNMllrIn0.eyJhdWQiOiJodHRwczovL2dyYXBoLm1pY3Jvc29mdC5jb20iLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLm5ldC82ZmNlNGJiOC0zNTAxLTQxYzktYWZjYy1kYjBmYjUxYzdlM2QvIiwiaWF0IjoxNTI1ODQ2MDM2LCJuYmYiOjE1MjU4NDYwMzYsImV4cCI6MTUyNTg0OTkzNiwiYWNyIjoiMSIsImFpbyI6IkFTUUEyLzhIQUFBQTFqSWVwamJFbHhBRGVZN3RCOWZqS0oyV1RBeHYzdVByeVE2OUorU2pqYXM9IiwiYW1yIjpbInB3ZCJdLCJhcHBfZGlzcGxheW5hbWUiOiJ0ZXN0IG91dGxvb2sgcmVzdCIsImFwcGlkIjoiODZiMGY2MWMtMmU2OS00MWRmLWJkYmUtNDllYmNlM2Y3Nzk1IiwiYXBwaWRhY3IiOiIxIiwiZmFtaWx5X25hbWUiOiJTaWRvcm92IiwiZ2l2ZW5fbmFtZSI6IlNlcmdleSIsImlwYWRkciI6IjkxLjIxNy4yNDguMTEiLCJuYW1lIjoiU2lkb3JvdiBTZXJnZXkiLCJvaWQiOiJiMTEzMTM5NS1mOTUwLTQxYmItYmQ1Zi05NjlhYjJhZDM2ZjciLCJvbnByZW1fc2lkIjoiUy0xLTUtMjEtMjQzMDY3MTQ2Mi0yODUyOTcxNTUxLTI3OTYwMTEwNTUtMjE0NTIiLCJwbGF0ZiI6IjMiLCJwdWlkIjoiMTAwMzAwMDA4OTMxQjUzMSIsInNjcCI6IkNhbGVuZGFycy5SZWFkIENhbGVuZGFycy5SZWFkLlNoYXJlZCBDYWxlbmRhcnMuUmVhZFdyaXRlIENvbnRhY3RzLlJlYWQgQ29udGFjdHMuUmVhZFdyaXRlIERldmljZS5SZWFkIEZpbGVzLlJlYWQgRmlsZXMuUmVhZFdyaXRlLkFsbCBNYWlsLlJlYWQgTWFpbC5SZWFkV3JpdGUgTWFpbGJveFNldHRpbmdzLlJlYWRXcml0ZSBOb3Rlcy5SZWFkV3JpdGUuQWxsIFBlb3BsZS5SZWFkIFNpdGVzLlJlYWRXcml0ZS5BbGwgVGFza3MuUmVhZCBUYXNrcy5SZWFkV3JpdGUgVXNlci5SZWFkIFVzZXIuUmVhZEJhc2ljLkFsbCBVc2VyLlJlYWRXcml0ZSIsInNpZ25pbl9zdGF0ZSI6WyJpbmtub3dubnR3ayIsImttc2kiXSwic3ViIjoiYmdObElSOWVoYnpqMWlPU05FZkVXRjJJZnFoeWgzQ242UXhjZ3otalp6OCIsInRpZCI6IjZmY2U0YmI4LTM1MDEtNDFjOS1hZmNjLWRiMGZiNTFjN2UzZCIsInVuaXF1ZV9uYW1lIjoic2VyZ2V5LnNpZG9yb3ZAZGlnaWEuY29tIiwidXBuIjoic2VyZ2V5LnNpZG9yb3ZAZGlnaWEuY29tIiwidXRpIjoiYlpvbXAtaDc4MENqSHZWMlBMSTRBQSIsInZlciI6IjEuMCJ9.CioKHvkMHM9Y8Z9xHPCnnAhu37I6nnG5BVJG8rZAAEo8xBUWk7Ol13rBJ-Nok6FdNMJKsagKUs6hwIBiNQC7vI1fC9RALsN06ZAdp_E28LESn3sjiBU_9OJrwmjVoOTE6r1XzwtyFin9F_0P0XrSWW9AZOTQ7EVskTivMMBW3-lTHmGM8w-yhNApc94STiy3mVcdg0TIdavCf4kIWqQANQbC6jcMm0L_iw31BgX3_MusKpsj1xd7MArL6YCRs2S6E3VXDBmiLBmEjbd9Ckp__31JokgVX0sXqpVuvNyGC6bfgVxFJkw9J-FpJ9k0j_7KDsYvoe8_SraxrKcWiuKFTQ";
         it = at;
 
         for (String[] token2 : new String[][]{{"access", at}}) {
@@ -1329,7 +1340,7 @@ public class OutlookAuth {
             try {
                 //RoomLists rl = oa.roomsLists(token2[1]);
                 //RoomLists rl = oa.fetchRooms(token2[1], TIME_PERIOD.today);
-                RoomLists rl = oa.fetchRooms(token2[1], 1);
+                RoomLists rl = oa.fetchRooms(token2[1], 14);
                 System.out.println("Response:\n" + rl);
                 List<TimeSlot> tss = oa.eventsListDays(
                         token2[1],
@@ -1353,6 +1364,7 @@ public class OutlookAuth {
                 long[] range = rl.timeSlotsRange();
                 range[0] = roundTimeHour(null, range[0], true);
                 range[1] = roundTimeHour(null, range[1], false);
+                System.out.println("\ntime slots (" + rl.timeSlotsC + ") " + (rl.timeSlotsNS - rl.roomsListNS) / 1000000f + "ms.");
                 System.out.println("ASCII: " + rl.toASCII(null, range[0], range[1], 1000 * 60 * 15 * 2 / 6));
             } catch (Throwable th) {
                 th.printStackTrace();
