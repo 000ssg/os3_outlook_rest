@@ -72,9 +72,9 @@ public class ServletServer {
 									.addMapping("/messages"),
 							servlet("OutlookServletT6", OutlookServlet.class)
 									.addInitParam(OutlookServlet.M, "manifests")
-									.addMapping("/manifests"),
-							servlet("OutlookServletT7", REST.class)
-									.addMapping("/REST/*")
+									.addMapping("/manifests")
+//							servlet("OutlookServletT7", REST.class)
+//									.addMapping("/REST/*")
 
 			);
 
