@@ -11,6 +11,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PushbackReader;
+import java.io.Reader;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
@@ -81,7 +82,7 @@ public class xJSON {
     }
 
     public static Object readLiteral(PushbackReader rdr) throws IOException {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder(1024);
         int ch = 0;
         boolean done = false;
         while ((ch = rdr.read()) != -1) {
@@ -128,9 +129,9 @@ public class xJSON {
         while ((ch = rdr.read()) != -1) {
             switch (ch) {
                 case ' ':
+                case '\t':
                 case '\n':
                 case '\r':
-                case '\t':
                 case '\b':
                 case '\f':
                     break;
@@ -142,7 +143,7 @@ public class xJSON {
     }
 
     public static Map readMap(PushbackReader rdr) throws IOException {
-        Map m = new LinkedHashMap();
+        Map m = new LinkedHashMap(20);
 
         int ch = 0;
         String s = null;
@@ -199,7 +200,7 @@ public class xJSON {
     }
 
     public static List readList(PushbackReader rdr) throws IOException {
-        List l = new ArrayList();
+        List l = new ArrayList(20);
 
         int ch = 0;
         boolean expectSeparator = false;
@@ -263,6 +264,10 @@ public class xJSON {
         return read(new PushbackReader(new InputStreamReader(is, encoding)));
     }
 
+    public static <T> T read(Reader rdr) throws IOException {
+        return read((rdr instanceof PushbackReader) ? (PushbackReader) rdr : new PushbackReader(rdr, 5));
+    }
+
     public static String write(Object obj) throws IOException {
         StringWriter wr = new StringWriter();
         write(obj, wr);
@@ -283,16 +288,25 @@ public class xJSON {
         } else if (obj instanceof Number) {
             writer.write("" + obj);
         } else if (obj instanceof String) {
-            writer.write('"' + ((String) obj)
-                    .replace("\\", "\\\\")
-                    .replace("/", "\\/")
-                    .replace("\"", "\\\"")
-                    .replace("\n", "\\n")
-                    .replace("\r", "\\r")
-                    .replace("\t", "\\t")
-                    .replace("\f", "\\f")
-                    .replace("\b", "\\b")
-                    + '"');
+            writer.write('"');
+            for(char ch:((String)obj).toCharArray()) {
+                switch(ch){
+                    case '\\':
+                    case '/':
+                    case '"':
+                    case '\t':
+                    case '\n':
+                    case '\r':
+                    case '\f':
+                    case '\b':
+                        writer.write('\\');
+                        writer.write(ch);
+                        break;
+                    default:
+                        writer.write(ch);
+                }
+            }
+            writer.write('"');
         } else if (obj instanceof byte[]) {
             writer.write('"' + Base64.getEncoder().encodeToString((byte[]) obj) + '"');
         } else if (obj instanceof Collection) {
