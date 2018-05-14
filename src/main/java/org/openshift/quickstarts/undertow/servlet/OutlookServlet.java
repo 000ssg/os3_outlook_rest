@@ -99,6 +99,12 @@ public class OutlookServlet extends HttpServlet {
             } catch (Throwable th) {
                 extra = "Messages:\n" + rrl + "\n---  ERROR:\n  " + th;
             }
+        } else if ("manifests".equals(m)) {
+            try {
+                extra = Dump.findAllManifests();
+            } catch (Throwable th) {
+                extra = th.toString();
+            }
         }
 
         PrintWriter writer = resp.getWriter();
@@ -109,6 +115,7 @@ public class OutlookServlet extends HttpServlet {
         writer.write("<table><caption>Outlook login (" + m + ")</caption>");
         writer.write("<tr><th>User</th><td><input type='text' name='user' value='" + u + "'></td></tr>");
         writer.write("<tr><th>login</th><td><a href='/login'>LOGIN</a></td></tr>");
+        writer.write("<tr><th>manifests</th><td><a href='/manifests'>Java library manifests</a></td></tr>");
         writer.write("<tr><th>messages</th><td><a href='/messages'>MESSAGES</a></td></tr>");
         writer.write("<tr><th>roomlists</th><td><a href='/roomslists'>ROOM LISTS</a>");
         try {

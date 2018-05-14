@@ -3,18 +3,27 @@
  */
 package org.openshift.quickstarts.undertow.servlet;
 
+import java.io.ByteArrayOutputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Array;
+import java.net.URL;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  *
  * @author 000ssg
  */
 public class Dump {
+
     public static String dump(Object obj, boolean indented, boolean counted) {
         if (obj instanceof Map) {
             return dumpMap(obj, indented, counted);
@@ -159,4 +168,61 @@ public class Dump {
             return r;
         }
     }
+
+    public static String findAllManifests() {
+        StringBuilder sb = new StringBuilder();
+        Set<URL> processed = new HashSet<URL>();
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        byte[] buf = new byte[1024];
+        for (String manifestFile : new String[]{"META-INF/MANIFEST.MF", "META-INF\\MANIFEST.MF"}) {
+            try {
+                Enumeration<URL> urlsEnum = Dump.class.getClassLoader().getResources(manifestFile);
+                if (urlsEnum != null) {
+                    while (urlsEnum.hasMoreElements()) {
+                        URL url = urlsEnum.nextElement();
+                        if (processed.contains(url)) {
+                            continue;
+                        }
+                        processed.add(url);
+                        sb.append("[" + url + "]\n");
+                        baos.reset();
+                        try {
+                            InputStream is = null;
+                            try {
+                                is = url.openStream();
+                                int c = 0;
+                                while ((c = is.read(buf)) != -1) {
+                                    baos.write(buf, 0, c);
+                                }
+                                sb.append("\t" + baos.toString().replace("\n", "\n\t"));
+                            } finally {
+                                try {
+                                    is.close();
+                                } catch (Throwable th) {
+                                }
+                            }
+                        } catch (Throwable th) {
+                            sb.append("\tERROR:\t" + th + "\n");
+                        }
+                    }
+                }
+            } catch (Throwable th) {
+                sb.append("Failed to get manfests: " + th);
+            }
+        }
+        try {
+            List<String> all = new ArrayList<String>(processed.size());
+            for (URL url : processed) {
+                all.add(url.toString());
+            }
+            Collections.sort(all);
+            sb.append("\n\n[all manifest URLs]\n");
+            for (String s : all) {
+                sb.append("\t" + s + "\n");
+            }
+        } catch (Throwable th) {
+        }
+        return sb.toString();
+    }
+
 }
