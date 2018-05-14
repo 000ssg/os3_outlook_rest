@@ -110,7 +110,7 @@ public class OutlookServlet extends HttpServlet {
         PrintWriter writer = resp.getWriter();
         writer.write("<html><header>");
         writer.write("</header><body>");
-        writer.write("<h1>Outlook OAuth test</h1>");
+        writer.write("<h1>Outlook OAuth test 0x001</h1>");
         writer.write("<form method='POST'>");
         writer.write("<table><caption>Outlook login (" + m + ")</caption>");
         writer.write("<tr><th>User</th><td><input type='text' name='user' value='" + u + "'></td></tr>");
