@@ -27,7 +27,7 @@ public class OutlookServlet extends HttpServlet {
     private String u;
     private String p;
 
-    OutlookAuth oa = new OutlookAuth("86b0f61c-2e69-41df-bdbe-49ebce3f7795");
+    public static OutlookAuth oa = new OutlookAuth("86b0f61c-2e69-41df-bdbe-49ebce3f7795");
     String outlookToken;
 
     @Override

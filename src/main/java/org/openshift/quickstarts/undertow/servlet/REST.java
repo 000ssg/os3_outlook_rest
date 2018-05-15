@@ -25,6 +25,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
+import org.openshift.quickstarts.undertow.my.ORAPI;
 
 /**
  *
@@ -43,7 +44,6 @@ public class REST extends HttpServlet {
 //            if (ctx.service() instanceof DigiaIABase) {
 //                ((DigiaIABase) ctx.service()).setLastActivityAt(System.currentTimeMillis());
 //            }
-
             return r;
         }
 
@@ -95,6 +95,9 @@ public class REST extends HttpServlet {
             while (sans.hasMoreElements()) {
                 String n = sans.nextElement();
                 Object o = request.getSession().getAttribute(n);
+                if (o instanceof ORAPI) {
+                    ((ORAPI) o).setToken((String) request.getSession().getAttribute("token"));
+                }
 //                if (o instanceof DigiaIABase) {
 //                    DigiaIABase ia = (DigiaIABase) o;
 //                    if (ia.getHost() == null) {

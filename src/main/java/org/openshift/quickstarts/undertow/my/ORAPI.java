@@ -10,6 +10,7 @@ import com.ssg.common.annotations.XParameter;
 import com.ssg.common.annotations.XType;
 import java.io.IOException;
 import org.openshift.quickstarts.undertow.servlet.OutlookAuth;
+import org.openshift.quickstarts.undertow.servlet.OutlookServlet;
 
 /**
  *
@@ -24,9 +25,20 @@ public class ORAPI {
     long timestamp;
     long expire = System.currentTimeMillis();
 
+    
+    OutlookAuth getOA() {
+        if(oauth==null) oauth=OutlookServlet.oa;
+        return oauth;
+    }
+    
     @XMethod
     public boolean isLoggedIn() {
-        return oauth != null;
+        return oauth != null && token != null;
+    }
+
+    @XMethod
+    public void setToken(@XParameter(name = "token") String token) {
+        this.token = token;
     }
 
     @XMethod
@@ -39,7 +51,7 @@ public class ORAPI {
         }
 
         if (force || rls == null || expire <= System.currentTimeMillis()) {
-            rls = oauth.fetchRooms(token, OutlookAuth.TIME_PERIOD.today);
+            rls = getOA().fetchRooms(token, OutlookAuth.TIME_PERIOD.today);
             timestamp = System.currentTimeMillis();
             expire = timestamp + 1000 * 60 * 60 * 5;
         }
