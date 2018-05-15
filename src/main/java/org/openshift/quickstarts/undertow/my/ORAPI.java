@@ -5,9 +5,6 @@
  */
 package org.openshift.quickstarts.undertow.my;
 
-import com.ssg.common.annotations.XMethod;
-import com.ssg.common.annotations.XParameter;
-import com.ssg.common.annotations.XType;
 import java.io.IOException;
 import org.openshift.quickstarts.undertow.servlet.OutlookAuth;
 import org.openshift.quickstarts.undertow.servlet.OutlookServlet;
@@ -16,7 +13,6 @@ import org.openshift.quickstarts.undertow.servlet.OutlookServlet;
  *
  * @author sesidoro
  */
-@XType
 public class ORAPI {
 
     OutlookAuth oauth;
@@ -25,24 +21,22 @@ public class ORAPI {
     long timestamp;
     long expire = System.currentTimeMillis();
 
-    
     OutlookAuth getOA() {
-        if(oauth==null) oauth=OutlookServlet.oa;
+        if (oauth == null) {
+            oauth = OutlookServlet.oa;
+        }
         return oauth;
     }
-    
-    @XMethod
+
     public boolean isLoggedIn() {
         return oauth != null && token != null;
     }
 
-    @XMethod
-    public void setToken(@XParameter(name = "token") String token) {
+    public void setToken(String token) {
         this.token = token;
     }
 
-    @XMethod
-    public OutlookAuth.RoomLists rooms(@XParameter(name = "force") Boolean force, @XParameter(name = "async") Boolean async) throws IOException {
+    public OutlookAuth.RoomLists rooms(Boolean force, Boolean async) throws IOException {
         if (force == null) {
             force = false;
         }
